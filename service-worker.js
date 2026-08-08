@@ -1,4 +1,4 @@
-const CACHE_NAME = 'equity-cost-engine-v6';
+const CACHE_NAME = 'equity-cost-engine-v7';
 const APP_SHELL = [
   './index.html',
   './manifest.json',

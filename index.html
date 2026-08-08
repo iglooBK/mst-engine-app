@@ -656,6 +656,63 @@
             font-weight: 700;
         }
 
+        /* 圖表卡片區塊 */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card {
+            background: #090c10;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 14px;
+            height: 260px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.75rem;
+            color: var(--accent-amber);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .chart-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .chart-card-header h3 {
+            margin: 0;
+        }
+
+        .chart-card.is-collapsed {
+            height: auto;
+        }
+
+        .chart-card.is-collapsed .chart-container {
+            display: none;
+        }
+
+        .chart-card.is-collapsed .chart-card-header {
+            margin-bottom: 0;
+        }
+
         /* 表格樣式 */
         .table-wrapper {
             overflow-x: auto;
@@ -935,7 +992,7 @@
 
 <div class="container">
     <div class="status-bar">
-        <div><span class="status-indicator"></span>TWSE ODD-LOT ENGINE v2.5 // BLOOMBERG LIVE NEWS MODE</div>
+        <div><span class="status-indicator"></span>TWSE ODD-LOT ENGINE v2.5.1 // BLOOMBERG LIVE NEWS MODE</div>
         <div id="saveStatusTag" style="color: var(--accent-cyan); font-weight: 700;">AUTO-SAVED</div>
     </div>
 
@@ -1148,6 +1205,8 @@
             <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">此區塊需額外抓取約一年份資料，點擊上方按鈕載入（載入需要幾秒鐘）</div>
         </div>
     </div>
+    </div>
+
 
     <div class="table-wrapper">
         <table>
@@ -1180,7 +1239,7 @@
     </div>
 
     <div class="footer">
-        POWERED BY BLOOMBERG TERMINAL STYLE FINANCIAL ENGINE V10.0
+        POWERED BY BLOOMBERG TERMINAL STYLE FINANCIAL ENGINE V2.5.1
     </div>
 </div>
 
@@ -1433,9 +1492,66 @@
         return results;
     }
 
-    /* 📈 TPEx：官方個股月成交資訊。日期參數使用民國年 YYYY/ＭＭ。
-       回傳 aaData 欄位：日期、成交股數、成交金額、開盤、最高、最低、收盤、漲跌、成交筆數。 */
-    async function fetchTpexRecentCloses(stockNo, minCount, maxMonthsToTry = 8) {
+    /* 📈 TPEx 上櫃歷史行情
+       GitHub Pages / iPad Safari 直接呼叫 TPEx 舊 st43_result.php 可能受到 CORS / 網站防護影響。
+       因此上櫃股票優先使用 Yahoo Finance Chart API 的 .TWO 代號取得 OHLC 日線；
+       若 Yahoo 暫時失敗，再回退至 TPEx 官方個股月成交資訊。 */
+    function yahooChartRowsToCloses(json) {
+        try {
+            const result = json && json.chart && Array.isArray(json.chart.result) ? json.chart.result[0] : null;
+            if (!result || !Array.isArray(result.timestamp) || !result.indicators || !Array.isArray(result.indicators.quote)) return [];
+            const quote = result.indicators.quote[0] || {};
+            const rows = [];
+            result.timestamp.forEach((ts, i) => {
+                const closeVal = Number(quote.close && quote.close[i]);
+                if (!Number.isFinite(closeVal)) return;
+                const highVal = Number(quote.high && quote.high[i]);
+                const lowVal = Number(quote.low && quote.low[i]);
+                const twDate = new Date((Number(ts) + 8 * 3600) * 1000);
+                const yearAD = twDate.getUTCFullYear();
+                const m = twDate.getUTCMonth() + 1;
+                const d = twDate.getUTCDate();
+                rows.push({
+                    date: new Date(yearAD, m - 1, d),
+                    dateStr: `${yearAD}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+                    close: closeVal,
+                    high: Number.isFinite(highVal) ? highVal : closeVal,
+                    low: Number.isFinite(lowVal) ? lowVal : closeVal
+                });
+            });
+            return rows;
+        } catch (e) {
+            console.error('Yahoo chart parse error:', e);
+            return [];
+        }
+    }
+
+    async function fetchTpexYahooCloses(stockNo, minCount, maxMonthsToTry = 8) {
+        const requestedDays = Math.max(380, Math.ceil(minCount * 2.2), maxMonthsToTry * 40);
+        const period2 = Math.floor(Date.now() / 1000) + 86400 * 2;
+        const period1 = period2 - requestedDays * 86400;
+        const symbol = `${String(stockNo).toUpperCase()}.TWO`;
+        const hosts = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+
+        for (const host of hosts) {
+            try {
+                const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d&events=history&includeAdjustedClose=true`;
+                const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                const rows = yahooChartRowsToCloses(json);
+                if (rows.length > 0) {
+                    console.info(`TPEx ${stockNo}: Yahoo ${host} 取得 ${rows.length} 個交易日`);
+                    return rows.sort((a, b) => a.date - b.date);
+                }
+            } catch (e) {
+                console.warn(`TPEx Yahoo history failed (${host}) for ${stockNo}:`, e);
+            }
+        }
+        return [];
+    }
+
+    async function fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry = 8) {
         const results = [];
         const now = new Date();
         let year = now.getFullYear();
@@ -1447,7 +1563,7 @@
             const rocMonth = `${rocYear}/${String(month).padStart(2, '0')}`;
             try {
                 const url = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${encodeURIComponent(rocMonth)}&stkno=${encodeURIComponent(stockNo)}`;
-                const res = await fetch(url, { cache: 'no-store' });
+                const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const json = await res.json();
                 const rows = json && Array.isArray(json.aaData) ? json.aaData : [];
@@ -1470,22 +1586,29 @@
                         low: isNaN(lowVal) ? closeVal : lowVal
                     };
                 }).filter(Boolean);
-
                 results.unshift(...monthCloses);
             } catch (e) {
-                console.error('TPEx history fetch error for', rocMonth, stockNo, e);
+                console.warn('TPEx official history fetch error for', rocMonth, stockNo, e);
             }
 
             monthsTried++;
             month--;
             if (month === 0) { month = 12; year--; }
-            await new Promise(r => setTimeout(r, 180));
+            await new Promise(r => setTimeout(r, 120));
         }
 
-        // 防止來源重複列出同一交易日
         const byDate = new Map();
         results.forEach(item => byDate.set(item.dateStr, item));
         return Array.from(byDate.values()).sort((a, b) => a.date - b.date);
+    }
+
+    async function fetchTpexRecentCloses(stockNo, minCount, maxMonthsToTry = 8) {
+        const yahooRows = await fetchTpexYahooCloses(stockNo, minCount, maxMonthsToTry);
+        if (yahooRows.length >= Math.min(minCount, 20)) return yahooRows;
+
+        const officialRows = await fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry);
+        if (officialRows.length > 0) return officialRows;
+        return yahooRows;
     }
 
     /* 📈 台股統一入口：自動依 stock-list.js 的 market 分流 TWSE / TPEx */
@@ -1531,7 +1654,7 @@
             const closes = await fetchRecentCloses(stockNo, 65);
 
             if (!closes || closes.length === 0) {
-                statusEl.textContent = `❌ 查無「${stockNo}」歷史股價，請確認股票代碼是否正確。`;
+                statusEl.textContent = getStockMarket(stockNo) === 'TPEx' ? `❌ 無法取得「${stockNo}」上櫃歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。` : `❌ 查無「${stockNo}」歷史股價，請確認股票代碼是否正確。`;
                 renderCrossAlert(null);
                 renderSupportResistance(null);
                 renderLatestPrice(null);
@@ -2528,6 +2651,10 @@
         let totalBuyFee = 0;
         let totalBuyCost = 0;
 
+        const rowLabels = [];
+        const rowCosts = [];
+        const rowPnLs = [];
+        const rowPnLColors = [];
 
         rows.forEach((row, idx) => {
             const posIndexText = `#${idx + 1}`;
@@ -2572,6 +2699,10 @@
                 totalBuyFee += buyFee;
                 totalBuyCost += rowTotalCost;
 
+                rowLabels.push(`POS ${posIndexText}`);
+                rowCosts.push(rowTotalCost);
+                rowPnLs.push(positionPnL);
+                rowPnLColors.push(positionPnL >= 0 ? '#ff3b30' : '#34c759');
             }
         });
 
@@ -2609,7 +2740,6 @@
             autoSave();
         }
     }
-
 
     window.onload = init;
 
