@@ -1040,6 +1040,114 @@
                 align-items: stretch;
             }
         }
+
+
+        /* 🧭 PLOUTOS 新手進出場決策引擎 */
+        .ploutos-guide {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #1a2234;
+        }
+        .ploutos-guide-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .ploutos-guide-title strong {
+            color: #f4d27a;
+            font-size: 0.78rem;
+            letter-spacing: 0.7px;
+        }
+        .ploutos-bias-pill {
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--card-border);
+            background: #0d131f;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .ploutos-bias-pill.bullish { color: var(--profit-color); border-color: rgba(255,59,48,.45); background: rgba(255,59,48,.07); }
+        .ploutos-bias-pill.bearish { color: var(--loss-color); border-color: rgba(52,199,89,.45); background: rgba(52,199,89,.07); }
+        .ploutos-bias-pill.neutral { color: var(--accent-amber); border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.06); }
+        .ploutos-guide-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .ploutos-guide-box {
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 11px 10px;
+            min-height: 105px;
+        }
+        .ploutos-guide-box.entry { border-color: rgba(6,182,212,.45); }
+        .ploutos-guide-box.profit { border-color: rgba(255,59,48,.38); }
+        .ploutos-guide-box.stop { border-color: rgba(245,158,11,.38); }
+        .ploutos-guide-box .guide-label {
+            color: var(--text-label);
+            font-size: 0.66rem;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+        .ploutos-guide-box .guide-price {
+            color: #fff;
+            font-size: 1.12rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .ploutos-guide-box.entry .guide-price { color: var(--accent-cyan); }
+        .ploutos-guide-box.profit .guide-price { color: var(--profit-color); }
+        .ploutos-guide-box.stop .guide-price { color: var(--accent-amber); }
+        .ploutos-guide-box .guide-note {
+            margin-top: 5px;
+            color: var(--text-muted);
+            font-size: 0.64rem;
+            line-height: 1.45;
+        }
+        .ploutos-guide-bottom {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .ploutos-rr, .ploutos-action {
+            background: #090c10;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 10px 12px;
+        }
+        .ploutos-rr .rr-value {
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .ploutos-action strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.78rem;
+        }
+        .ploutos-action .action-reason, .ploutos-rr .rr-detail {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            line-height: 1.5;
+        }
+        .ploutos-disclaimer {
+            margin-top: 9px;
+            color: #64748b;
+            font-size: 0.64rem;
+            line-height: 1.5;
+        }
+        @media (max-width: 680px) {
+            .ploutos-guide-grid { grid-template-columns: 1fr; }
+            .ploutos-guide-bottom { grid-template-columns: 1fr; }
+            .ploutos-guide-title { align-items: flex-start; flex-direction: column; }
+        }
     
         .stock-meta-line {
             min-height: 18px;
@@ -1297,6 +1405,49 @@
                 </div>
             </div>
             <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 8px;">紅=價位在現價之上（壓力關卡）、綠=價位在現價之下（支撐關卡）｜樞紐點依最近交易日高低收盤價計算，僅供參考，非投資建議</div>
+
+            <div class="ploutos-guide" id="ploutosGuide">
+                <div class="ploutos-guide-title">
+                    <strong>🧭 PLOUTOS ENTRY / EXIT ENGINE // 新手進出場決策參考</strong>
+                    <span class="ploutos-bias-pill neutral" id="ploutosBias">等待資料</span>
+                </div>
+                <div id="ploutosGuideStatus" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:9px;">將依均線、交叉訊號與支撐/壓力自動評估</div>
+                <div class="ploutos-guide-grid">
+                    <div class="ploutos-guide-box entry">
+                        <div class="guide-label">ENTRY ZONE // 建議建倉區</div>
+                        <div class="guide-price" id="ploutosEntry">--</div>
+                        <div class="guide-note" id="ploutosEntryNote">--</div>
+                    </div>
+                    <div class="ploutos-guide-box profit">
+                        <div class="guide-label">TP1 // 第一停利區</div>
+                        <div class="guide-price" id="ploutosProfit">--</div>
+                        <div class="guide-note" id="ploutosProfitNote">--</div>
+                    </div>
+                    <div class="ploutos-guide-box profit">
+                        <div class="guide-label">TP2 // 第二停利區</div>
+                        <div class="guide-price" id="ploutosTP2">--</div>
+                        <div class="guide-note" id="ploutosTP2Note">突破 TP1 後再觀察</div>
+                    </div>
+                    <div class="ploutos-guide-box stop">
+                        <div class="guide-label">STOP LOSS // 防守參考</div>
+                        <div class="guide-price" id="ploutosStop">--</div>
+                        <div class="guide-note" id="ploutosStopNote">--</div>
+                    </div>
+                </div>
+                <div class="ploutos-guide-bottom">
+                    <div class="ploutos-rr">
+                        <div style="font-size:0.66rem; color:var(--text-label); font-weight:800; margin-bottom:5px;">RISK / REWARD // 風險報酬比</div>
+                        <div class="rr-value" id="ploutosRR">--</div>
+                        <div class="rr-detail" id="ploutosRRDetail">--</div>
+                    </div>
+                    <div class="ploutos-action">
+                        <div style="font-size:0.66rem; color:var(--text-label); font-weight:800; margin-bottom:5px;">ACTION // 行動參考</div>
+                        <strong id="ploutosAction">🟡 WAIT // 等待資料</strong>
+                        <div class="action-reason" id="ploutosActionReason">完成技術資料擷取後自動產生。</div>
+                    </div>
+                </div>
+                <div class="ploutos-disclaimer">⚠ 本區為技術分析模型依歷史價格、均線與支撐/壓力推算之參考區間，不代表未來價格，也不是保證獲利或個人化投資建議。建議分批操作並自行評估風險承受能力。</div>
+            </div>
         </div>
     </div>
 
@@ -1740,6 +1891,7 @@
             statusEl.textContent = '⚠️ 未偵測到股票代碼，請在名稱中包含代碼 (例如：聯發科 2454)';
             renderCrossAlert(null);
             renderSupportResistance(null);
+            renderPloutosGuide(null);
             renderLatestPrice(null);
             return;
         }
@@ -1754,6 +1906,7 @@
                 statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。`;
                 renderCrossAlert(null);
                 renderSupportResistance(null);
+                renderPloutosGuide(null);
                 renderLatestPrice(null);
                 return;
             }
@@ -1807,12 +1960,17 @@
             updateTechnicalChart(closes);
 
             // 同樣重複使用這批資料計算支撐/壓力價位，無需額外連線
-            renderSupportResistance(computeSupportResistance(closes));
+            const sr = computeSupportResistance(closes);
+            renderSupportResistance(sr);
+
+            // PLOUTOS 新手決策引擎：直接整合 MA / 交叉訊號 / 支撐壓力，不新增 API
+            renderPloutosGuide(computePloutosGuide(closes, sr));
         } catch (error) {
             console.error('Moving average error:', error);
             statusEl.textContent = `❌ 均線資料擷取失敗，可能是網路問題，或 ${getStockMarketDisplay(stockNo)} 暫時無法連線，請稍後重試。`;
             renderCrossAlert(null);
             renderSupportResistance(null);
+            renderPloutosGuide(null);
             renderLatestPrice(null);
         }
     }
@@ -2004,6 +2162,468 @@
         applyLevel(ids.s1, sr.S1);
 
         statusEl.textContent = `✅ 依現價 $${formatNumber(sr.latestClose, 2)} 計算｜紅=壓力（價位在現價之上）、綠=支撐（價位在現價之下）`;
+    }
+
+
+    /* 🧭 PLOUTOS ENTRY / EXIT ENGINE
+       將既有 MA、交叉訊號、20/60日高低、Pivot S1/R1 整合成新手易懂的參考區間。
+       只做技術面解讀，不新增 API，也不將結果視為確定買賣訊號。 */
+    function computePloutosGuide(closes, sr) {
+        if (!closes || closes.length < 20 || !sr) return null;
+
+        const latest = closes[closes.length - 1];
+        const C = latest.close;
+        const ma5 = calcSMAAt(closes, 5, 0);
+        const ma10 = calcSMAAt(closes, 10, 0);
+        const ma20 = calcSMAAt(closes, 20, 0);
+        const ma60 = calcSMAAt(closes, 60, 0);
+        const prevMa5 = calcSMAAt(closes, 5, 1);
+        const prevMa10 = calcSMAAt(closes, 10, 1);
+        const prevMa20 = calcSMAAt(closes, 20, 1);
+        const cross = detectCross(closes);
+
+        const recent20 = closes.slice(-20);
+        const avgRange = recent20.reduce((sum, x) => sum + Math.max(0, (x.high || x.close) - (x.low || x.close)), 0) / recent20.length;
+        const zoneTolerance = Math.max(C * 0.015, avgRange * 0.9);
+
+        // ===== 1) 均線斜率：MA5 / MA10 / MA20 =====
+        // 使用「今日均線 vs 前一交易日均線」判斷上揚 / 下彎。
+        const maSlopeRows = [
+            { label: 'MA5', period: 5, value: ma5, prev: prevMa5 },
+            { label: 'MA10', period: 10, value: ma10, prev: prevMa10 },
+            { label: 'MA20', period: 20, value: ma20, prev: prevMa20 }
+        ].map(x => {
+            const slopePct = (Number.isFinite(x.value) && Number.isFinite(x.prev) && x.prev !== 0)
+                ? ((x.value - x.prev) / x.prev) * 100
+                : null;
+            return {
+                ...x,
+                slopePct,
+                direction: slopePct === null ? 'flat' : slopePct < -0.0001 ? 'down' : slopePct > 0.0001 ? 'up' : 'flat'
+            };
+        });
+
+        // 只要 MA5 / MA10 / MA20 有下彎，就優先把「下彎均線」當作建倉錨點。
+        // 若同時多條下彎，優先採用較長週期（MA20 > MA10 > MA5），
+        // 因為對新手而言，中期均線的向下拉力應比短線雜訊更優先處理。
+        const downwardMA = maSlopeRows
+            .filter(x => x.direction === 'down' && Number.isFinite(x.value) && x.value > 0 && x.value <= C * 1.012)
+            .sort((a, b) => b.period - a.period);
+
+        const priorityMA = downwardMA.length ? downwardMA[0] : null;
+
+        // ===== 2) Fibonacci 回撤 =====
+        // 以近 60 個交易日的高低區間做 38.2% / 50% / 61.8% 回撤。
+        // 61.8% 為黃金比例；若回撤位與下彎均線 / 支撐價位接近，視為較強群聚。
+        const recent60 = closes.slice(-Math.min(60, closes.length));
+        const swingHigh = Math.max(...recent60.map(x => Number(x.high ?? x.close)).filter(Number.isFinite));
+        const swingLow = Math.min(...recent60.map(x => Number(x.low ?? x.close)).filter(Number.isFinite));
+        const swingRange = Math.max(0, swingHigh - swingLow);
+
+        const fibLevels = swingRange > 0 ? [
+            { label: 'Fib 38.2%', ratio: 0.382, value: swingHigh - swingRange * 0.382 },
+            { label: 'Fib 50%', ratio: 0.5, value: swingHigh - swingRange * 0.5 },
+            { label: 'Fib 61.8%', ratio: 0.618, value: swingHigh - swingRange * 0.618 }
+        ].filter(x => Number.isFinite(x.value) && x.value > 0) : [];
+
+        // Fibonacci Extension：用於停利 / 目標價，不與 Entry 的回撤混用。
+        // 100% = 近60日波段高點；127.2% / 161.8% 為突破後延伸目標。
+        const fibExtensions = swingRange > 0 ? [
+            { label: 'Fib Ext 100%', ratio: 1.0, value: swingHigh },
+            { label: 'Fib Ext 127.2%', ratio: 1.272, value: swingLow + swingRange * 1.272 },
+            { label: 'Fib Ext 161.8%', ratio: 1.618, value: swingLow + swingRange * 1.618 }
+        ].filter(x => Number.isFinite(x.value) && x.value > 0) : [];
+
+        // 趨勢評分：均線排列、價格位置、均線斜率與近期交叉訊號
+        let trendScore = 0;
+        const trendReasons = [];
+
+        if (ma5 !== null && ma10 !== null) {
+            if (ma5 > ma10) { trendScore += 1; trendReasons.push('MA5>MA10'); }
+            else if (ma5 < ma10) { trendScore -= 1; trendReasons.push('MA5<MA10'); }
+        }
+        if (ma10 !== null && ma20 !== null) {
+            if (ma10 > ma20) { trendScore += 1; trendReasons.push('MA10>MA20'); }
+            else if (ma10 < ma20) { trendScore -= 1; trendReasons.push('MA10<MA20'); }
+        }
+        if (ma20 !== null && ma60 !== null) {
+            if (ma20 > ma60) { trendScore += 1; trendReasons.push('MA20>MA60'); }
+            else if (ma20 < ma60) { trendScore -= 1; trendReasons.push('MA20<MA60'); }
+        }
+        if (ma20 !== null) {
+            if (C >= ma20) trendScore += 1;
+            else trendScore -= 1;
+        }
+
+        maSlopeRows.forEach(x => {
+            if (x.direction === 'down') {
+                trendScore -= 1;
+                trendReasons.push(`${x.label}▼`);
+            } else if (x.direction === 'up') {
+                trendScore += 0.5;
+                trendReasons.push(`${x.label}▲`);
+            }
+        });
+
+        if (cross?.type === 'golden') { trendScore += 1; trendReasons.push('近期黃金交叉'); }
+        if (cross?.type === 'death') { trendScore -= 1; trendReasons.push('近期死亡交叉'); }
+
+        let bias = { key: 'neutral', label: '🟡 震盪 / 等待確認' };
+        if (trendScore >= 3) bias = { key: 'bullish', label: '🟢 偏多 / 結構較強' };
+        else if (trendScore <= -2) bias = { key: 'bearish', label: '🟢 偏弱 / 風險較高' };
+
+        // ===== 3) 支撐候選 =====
+        const rawSupports = [
+            ['MA5', ma5], ['MA10', ma10], ['MA20', ma20], ['MA60', ma60],
+            ['20日低點', sr.low20], ['60日低點', sr.low60], ['Pivot S1', sr.S1],
+            ...fibLevels.map(x => [x.label, x.value])
+        ].filter(([,v]) => Number.isFinite(v) && v > 0 && v <= C * 1.012);
+
+        // ===== 3B) 壓力 / 停利候選 =====
+        // Exit 與 Entry 對稱：前高壓力 + Pivot R1 + Fibonacci Extension + 均線動能。
+        const rawResistances = [
+            ['20日高點', sr.high20],
+            ['60日高點', sr.high60],
+            ['Pivot R1', sr.R1],
+            ...fibExtensions.map(x => [x.label, x.value])
+        ].filter(([,v]) => Number.isFinite(v) && v > 0 && v >= C * 0.988);
+
+        if (!rawSupports.length || !rawResistances.length) {
+            return { bias, trendScore, noSetup: true, reason: '目前支撐或壓力資料不足，暫不產生價格建議。' };
+        }
+
+        rawSupports.sort((a,b) => b[1] - a[1]);
+        rawResistances.sort((a,b) => a[1] - b[1]);
+
+        // ===== 4) Entry Zone 核心規則 =====
+        // A. 有下彎 MA5/10/20：下彎均線絕對優先，Entry Zone 以它為中心。
+        // B. 再吸收附近的 Fibonacci / 其他支撐，形成「均線 + 黃金比例」群聚。
+        // C. 沒有下彎均線：才回到原先「最近支撐群聚」模式。
+        let supportAnchor;
+        let supportCluster;
+        let entryPriorityText = '';
+
+        if (priorityMA) {
+            supportAnchor = priorityMA.value;
+            const priorityTolerance = Math.max(C * 0.012, avgRange * 0.75);
+
+            const nearby = rawSupports.filter(([,v]) => Math.abs(v - supportAnchor) <= priorityTolerance);
+            const primaryTuple = [priorityMA.label, priorityMA.value];
+
+            // 確保優先均線一定是群聚第一個來源
+            supportCluster = [primaryTuple];
+            nearby.forEach(item => {
+                if (item[0] !== priorityMA.label && supportCluster.length < 5) supportCluster.push(item);
+            });
+
+            const nearFib = fibLevels
+                .filter(x => Math.abs(x.value - supportAnchor) <= priorityTolerance)
+                .sort((a,b) => Math.abs(a.value - supportAnchor) - Math.abs(b.value - supportAnchor))[0];
+
+            entryPriorityText = `優先下彎 ${priorityMA.label} $${formatNumber(priorityMA.value, 2)}`;
+            if (nearFib) entryPriorityText += `｜鄰近 ${nearFib.label} $${formatNumber(nearFib.value, 2)}`;
+        } else {
+            supportAnchor = rawSupports[0][1];
+            supportCluster = rawSupports.filter(([,v]) => Math.abs(v - supportAnchor) <= zoneTolerance).slice(0, 5);
+            if (!supportCluster.length) supportCluster = [rawSupports[0]];
+
+            const nearFib = fibLevels
+                .filter(x => Math.abs(x.value - supportAnchor) <= zoneTolerance)
+                .sort((a,b) => Math.abs(a.value - supportAnchor) - Math.abs(b.value - supportAnchor))[0];
+            if (nearFib) entryPriorityText = `支撐群聚含 ${nearFib.label} $${formatNumber(nearFib.value, 2)}`;
+        }
+
+        // ===== 5) Take Profit：壓力群聚 + Fibonacci Extension + 均線動能 =====
+        // 先建立所有「高於 Entry」的目標候選，再聚類成 TP1 / TP2。
+        // MA5/10/20 全上揚時允許保留較遠的第二目標；若有下彎，TP1 採更保守的最近壓力。
+        const allUpMomentum = maSlopeRows.every(x => x.direction === 'up');
+        const anyDownMomentum = maSlopeRows.some(x => x.direction === 'down');
+
+        const exitCandidates = rawResistances
+            .filter(([,v]) => Number.isFinite(v) && v > 0)
+            .sort((a,b) => a[1] - b[1]);
+
+        let entryLow = Math.min(...supportCluster.map(x => x[1]));
+        let entryHigh = Math.max(...supportCluster.map(x => x[1]));
+
+        // 當有下彎均線時，避免其他較遠支撐把建倉區拉得過寬：
+        // 最終仍以優先均線為中心，保留合理的小區間。
+        if (priorityMA) {
+            const halfBand = Math.max(C * 0.006, avgRange * 0.35);
+            entryLow = Math.max(0.01, Math.max(entryLow, priorityMA.value - halfBand));
+            entryHigh = Math.min(C * 1.01, Math.min(entryHigh, priorityMA.value + halfBand));
+
+            // 若群聚剛好都落在同一側，仍讓優先均線位於區間內。
+            entryLow = Math.min(entryLow, priorityMA.value);
+            entryHigh = Math.max(entryHigh, priorityMA.value);
+        } else if (supportCluster.length === 1) {
+            const halfBand = Math.max(C * 0.004, avgRange * 0.25);
+            entryLow = Math.max(0.01, entryLow - halfBand);
+            entryHigh = Math.min(C * 1.01, entryHigh + halfBand);
+        }
+
+        const entryMid = (entryLow + entryHigh) / 2;
+
+        const usableExit = exitCandidates.filter(([,v]) => v > entryMid * 1.005);
+        if (!usableExit.length) {
+            return { bias, trendScore, noSetup: true, reason: '目前找不到高於建倉區的合理壓力 / Fibonacci 延伸目標。' };
+        }
+
+        const exitTolerance = Math.max(C * 0.015, avgRange * 0.9);
+        const firstAnchor = usableExit[0][1];
+        let resistanceCluster = usableExit
+            .filter(([,v]) => Math.abs(v - firstAnchor) <= exitTolerance * (anyDownMomentum ? 1.0 : 1.25))
+            .slice(0, 5);
+        if (!resistanceCluster.length) resistanceCluster = [usableExit[0]];
+
+        let profitLow = Math.min(...resistanceCluster.map(x => x[1]));
+        let profitHigh = Math.max(...resistanceCluster.map(x => x[1]));
+        if (resistanceCluster.length === 1) {
+            const halfBand = Math.max(C * 0.004, avgRange * 0.25);
+            profitLow = Math.max(entryMid * 1.006, profitLow - halfBand);
+            profitHigh = profitHigh + halfBand;
+        }
+
+        // TP2：尋找 TP1 上方下一個不同的壓力群聚。
+        // 強勢（MA5/10/20皆上揚）時，允許優先採 Fib Ext 127.2% / 161.8%；
+        // 動能轉弱時，TP2 仍顯示，但策略文字會偏向 TP1 分批停利。
+        const tp1Ceiling = profitHigh + exitTolerance * 0.55;
+        const secondPool = usableExit.filter(([,v]) => v > tp1Ceiling);
+        let tp2Cluster = [];
+        let tp2Low = null, tp2High = null;
+
+        if (secondPool.length) {
+            let secondAnchorItem = secondPool[0];
+
+            if (allUpMomentum) {
+                const extCandidate = secondPool.find(([label]) =>
+                    label === 'Fib Ext 127.2%' || label === 'Fib Ext 161.8%'
+                );
+                if (extCandidate && extCandidate[1] <= secondPool[0][1] * 1.10) {
+                    secondAnchorItem = extCandidate;
+                }
+            }
+
+            const secondAnchor = secondAnchorItem[1];
+            tp2Cluster = secondPool
+                .filter(([,v]) => Math.abs(v - secondAnchor) <= exitTolerance * 1.35)
+                .slice(0, 5);
+            if (!tp2Cluster.length) tp2Cluster = [secondAnchorItem];
+
+            tp2Low = Math.min(...tp2Cluster.map(x => x[1]));
+            tp2High = Math.max(...tp2Cluster.map(x => x[1]));
+            if (tp2Cluster.length === 1) {
+                const halfBand2 = Math.max(C * 0.005, avgRange * 0.30);
+                tp2Low = Math.max(profitHigh * 1.003, tp2Low - halfBand2);
+                tp2High = tp2High + halfBand2;
+            }
+        }
+
+        const profitMid = (profitLow + profitHigh) / 2;
+
+        const exitFibMatches = resistanceCluster.filter(x => String(x[0]).startsWith('Fib Ext')).length;
+        const exitStrength = Math.min(5, Math.max(1,
+            resistanceCluster.length
+            + (exitFibMatches ? 1 : 0)
+            + (allUpMomentum ? 1 : 0)
+        ));
+
+        let exitStrategyText = '';
+        if (allUpMomentum) {
+            exitStrategyText = tp2Low
+                ? 'MA5/10/20 全部上揚：TP1 建議分批停利；若有效突破，可續看 TP2。'
+                : 'MA5/10/20 全部上揚：到達 TP1 可分批停利，突破後再重新計算延伸目標。';
+        } else if (anyDownMomentum) {
+            exitStrategyText = '短中期均線已有下彎：TP1 停利權重提高，不建議把全部部位押在更遠目標。';
+        } else {
+            exitStrategyText = tp2Low
+                ? '動能中性：TP1 可先部分停利，剩餘部位再觀察 TP2。'
+                : '動能中性：以第一壓力群聚作為主要停利參考。';
+        }
+
+        // ===== 6) STOP LOSS：Structure Invalidation // 結構失效防守 =====
+        // 不採固定百分比；尋找 Entry 下方下一層真正支撐，跌破才代表原建倉理由失效。
+        const defenseCandidates = [
+            ['MA5', ma5], ['MA10', ma10], ['MA20', ma20], ['MA60', ma60],
+            ['20日低點', sr.low20], ['60日低點', sr.low60], ['Pivot S1', sr.S1],
+            ...fibLevels.map(x => [x.label, x.value])
+        ].filter(([,v]) => Number.isFinite(v) && v > 0 && v < entryLow * 0.998)
+         .sort((x,y) => y[1] - x[1]);
+
+        const defenseTolerance = Math.max(C * 0.012, avgRange * 0.75);
+        let defenseCluster = [];
+        if (defenseCandidates.length) {
+            const defenseAnchor = defenseCandidates[0][1];
+            defenseCluster = defenseCandidates
+                .filter(([,v]) => Math.abs(v - defenseAnchor) <= defenseTolerance)
+                .slice(0, 5);
+        }
+
+        let warningLevel, stopLoss, stopLossHigh, defenseSources;
+        if (defenseCluster.length) {
+            const defenseLow = Math.min(...defenseCluster.map(x => x[1]));
+            const defenseHigh = Math.max(...defenseCluster.map(x => x[1]));
+            warningLevel = defenseHigh;
+            const invalidationBuffer = Math.max(entryMid * 0.006, avgRange * 0.28);
+            stopLoss = Math.max(0.01, defenseLow - invalidationBuffer);
+            stopLossHigh = defenseLow;
+            defenseSources = defenseCluster.map(x => x[0]);
+        } else {
+            const fallbackBuffer = Math.max(entryMid * 0.022, avgRange * 0.85);
+            warningLevel = Math.max(0.01, entryLow - fallbackBuffer * 0.45);
+            stopLoss = Math.max(0.01, entryLow - fallbackBuffer);
+            stopLossHigh = Math.max(stopLoss, stopLoss + Math.max(avgRange * 0.20, entryMid * 0.003));
+            defenseSources = ['波動緩衝'];
+        }
+
+        const downCount = maSlopeRows.filter(x => x.direction === 'down').length;
+        let defenseState = '🟡 WARNING // 注意支撐測試';
+        let defenseText = '接近警戒區時先觀察，不建議追買或任意加碼。';
+        if (downCount === 3) {
+            defenseState = '🟠 DEFENSIVE // 提高警戒';
+            defenseText = 'MA5 / MA10 / MA20 同步下彎，原支撐結構正在弱化；不建議加碼。';
+        } else if (downCount >= 2) {
+            defenseState = '🟠 DEFENSIVE // 均線轉弱';
+            defenseText = 'MA5 / MA10 / MA20 至少兩條下彎，支撐失守時應提高風險意識。';
+        }
+
+        const risk = entryMid - stopLoss;
+        const reward = profitMid - entryMid;
+        const rr = risk > 0 ? reward / risk : null;
+        const riskPct = risk > 0 ? (risk / entryMid) * 100 : null;
+        const rewardPct = reward > 0 ? (reward / entryMid) * 100 : null;
+
+        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && profitMid > entryMid && rr > 0)) {
+            return { bias, trendScore, noSetup: true, reason: '目前價位結構缺乏合理的進場、停利與停損排列，建議等待更清楚的型態。' };
+        }
+
+        const distanceToEntryPct = ((C - entryHigh) / C) * 100;
+        const distanceToProfitPct = ((profitLow - C) / C) * 100;
+        let action = { cls: 'neutral', title: '🟡 WATCH // 等待確認', reason: '目前尚未形成特別有利的進場條件。' };
+
+        // 有任何 MA5/10/20 下彎時，即使整體排列偏多，也不直接鼓勵追價；
+        // 優先等待價格回到下彎均線 / Fib 群聚的 Entry Zone。
+        if (priorityMA && C > entryHigh * 1.01) {
+            action = {
+                cls: 'neutral',
+                title: '🟡 WATCH // 等待回測',
+                reason: `${priorityMA.label}仍下彎，優先等待價格回測該均線附近，再觀察是否與 Fibonacci 支撐形成止跌。`
+            };
+        } else if (trendScore <= -2) {
+            action = { cls: 'bearish', title: '🔴 RISK OFF // 風險偏高', reason: '均線結構偏弱，接近支撐也建議先觀察止跌或重新站回短期均線。' };
+        } else if (distanceToProfitPct >= 0 && distanceToProfitPct <= 2.0) {
+            action = { cls: 'neutral', title: '🟠 AVOID CHASING // 不宜追價', reason: '現價已靠近第一壓力/停利區，追價後的風險報酬空間較差。' };
+        } else if (C >= entryLow && C <= entryHigh * 1.006 && trendScore >= 3 && rr >= 2) {
+            action = { cls: 'bullish', title: '🟢 FAVORABLE ENTRY // 偏佳建倉', reason: '趨勢偏多、價格接近支撐群聚，且風險報酬比達 1:2 以上；仍建議分批而非一次投入。' };
+        } else if (distanceToEntryPct >= -0.5 && distanceToEntryPct <= 2.5 && trendScore >= 1 && rr >= 1.5) {
+            action = { cls: 'bullish', title: '🟢 ACCUMULATE // 分批布局', reason: '價格接近建倉區，且均線 / Fibonacci 支撐結構尚可，可採分批觀察方式。' };
+        } else if (distanceToEntryPct > 2.5) {
+            action = { cls: 'neutral', title: '🟡 WATCH // 等待回測', reason: '現價仍高於建倉參考區，等待回測支撐後可獲得較好的風險報酬結構。' };
+        }
+
+        const fibMatches = supportCluster.filter(x => String(x[0]).startsWith('Fib')).length;
+        const strength = Math.min(5, Math.max(1,
+            supportCluster.length
+            + (priorityMA ? 1 : 0)
+            + (fibMatches ? 1 : 0)
+            + (trendScore >= 3 ? 1 : 0)
+        ));
+
+        return {
+            bias, trendScore, trendReasons, action,
+            entryLow, entryHigh, profitLow, profitHigh, stopLoss, stopLossHigh, warningLevel,
+            tp2Low, tp2High,
+            defenseSources, defenseState, defenseText,
+            rr, riskPct, rewardPct, strength, exitStrength,
+            supportSources: supportCluster.map(x => x[0]),
+            resistanceSources: resistanceCluster.map(x => x[0]),
+            tp2Sources: tp2Cluster.map(x => x[0]),
+            current: C,
+            entryPriorityText,
+            exitStrategyText,
+            allUpMomentum,
+            anyDownMomentum,
+            priorityMA: priorityMA ? { label: priorityMA.label, value: priorityMA.value, slopePct: priorityMA.slopePct } : null,
+            fibLevels,
+            fibExtensions,
+            swingHigh,
+            swingLow
+        };
+    }
+
+    function renderPloutosGuide(data) {
+        const biasEl = document.getElementById('ploutosBias');
+        const statusEl = document.getElementById('ploutosGuideStatus');
+        const entryEl = document.getElementById('ploutosEntry');
+        const profitEl = document.getElementById('ploutosProfit');
+        const tp2El = document.getElementById('ploutosTP2');
+        const tp2Note = document.getElementById('ploutosTP2Note');
+        const stopEl = document.getElementById('ploutosStop');
+        const entryNote = document.getElementById('ploutosEntryNote');
+        const profitNote = document.getElementById('ploutosProfitNote');
+        const stopNote = document.getElementById('ploutosStopNote');
+        const rrEl = document.getElementById('ploutosRR');
+        const rrDetail = document.getElementById('ploutosRRDetail');
+        const actionEl = document.getElementById('ploutosAction');
+        const actionReason = document.getElementById('ploutosActionReason');
+        if (!biasEl) return;
+
+        if (!data) {
+            biasEl.className = 'ploutos-bias-pill neutral';
+            biasEl.textContent = '等待資料';
+            statusEl.textContent = '將依均線、交叉訊號與支撐/壓力自動評估';
+            entryEl.textContent = profitEl.textContent = stopEl.textContent = '--';
+            if (tp2El) tp2El.textContent = '--';
+            if (tp2Note) tp2Note.textContent = '暫無第二停利目標';
+            entryNote.textContent = profitNote.textContent = stopNote.textContent = '--';
+            rrEl.textContent = '--'; rrDetail.textContent = '--';
+            actionEl.textContent = '🟡 WAIT // 等待資料';
+            actionReason.textContent = '完成技術資料擷取後自動產生。';
+            return;
+        }
+
+        biasEl.className = `ploutos-bias-pill ${data.bias.key}`;
+        biasEl.textContent = data.bias.label;
+
+        if (data.noSetup) {
+            statusEl.textContent = `🟡 NO CLEAR SETUP // ${data.reason}`;
+            entryEl.textContent = profitEl.textContent = stopEl.textContent = '--';
+            if (tp2El) tp2El.textContent = '--';
+            if (tp2Note) tp2Note.textContent = '暫無第二停利目標';
+            entryNote.textContent = profitNote.textContent = stopNote.textContent = '暫不提供價格區間';
+            rrEl.textContent = '--'; rrDetail.textContent = '等待價格結構更清楚';
+            actionEl.textContent = '🟡 WATCH // 等待確認';
+            actionReason.textContent = data.reason;
+            return;
+        }
+
+        const stars = '★'.repeat(data.strength) + '☆'.repeat(5 - data.strength);
+        entryEl.textContent = `$${formatNumber(data.entryLow, 2)} ~ $${formatNumber(data.entryHigh, 2)}`;
+        profitEl.textContent = `$${formatNumber(data.profitLow, 2)} ~ $${formatNumber(data.profitHigh, 2)}`;
+        if (tp2El) tp2El.textContent = (Number.isFinite(data.tp2Low) && Number.isFinite(data.tp2High))
+            ? `$${formatNumber(data.tp2Low, 2)} ~ $${formatNumber(data.tp2High, 2)}` : '--';
+        if (tp2Note) tp2Note.textContent = (Number.isFinite(data.tp2Low) && Number.isFinite(data.tp2High))
+            ? `第二目標依據：${data.tp2Sources.join(' + ')}｜有效突破 TP1 後再觀察`
+            : '目前沒有足夠明確的第二壓力群聚';
+        stopEl.textContent = Number.isFinite(data.stopLossHigh) && data.stopLossHigh > data.stopLoss
+            ? `$${formatNumber(data.stopLoss, 2)} ~ $${formatNumber(data.stopLossHigh, 2)}`
+            : `$${formatNumber(data.stopLoss, 2)}`;
+        entryNote.textContent = `支撐強度 ${stars}｜${data.entryPriorityText ? data.entryPriorityText + '｜' : ''}依據：${data.supportSources.join(' + ')}`;
+        const exitStars = '★'.repeat(data.exitStrength || 1) + '☆'.repeat(5 - (data.exitStrength || 1));
+        profitNote.textContent = `壓力強度 ${exitStars}｜TP1依據：${data.resistanceSources.join(' + ')}｜${data.exitStrategyText || ''}`;
+        stopNote.textContent = `${data.defenseState}｜警戒 $${formatNumber(data.warningLevel, 2)}｜${data.defenseText}｜結構失效依據：${data.defenseSources.join(' + ')}｜盤中跌破先觀察；收盤有效跌破防守區，代表原建倉假設明顯失效。`;
+
+        let rrLabel = '🔴 不利';
+        if (data.rr >= 2) rrLabel = '🟢 良好';
+        else if (data.rr >= 1.5) rrLabel = '🟡 尚可';
+        else if (data.rr >= 1) rrLabel = '🟠 偏低';
+        rrEl.textContent = `1 : ${formatNumber(data.rr, 2)}  ${rrLabel}`;
+        rrDetail.textContent = `以建倉區中位估算｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%`;
+
+        actionEl.textContent = data.action.title;
+        actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
+        actionReason.textContent = data.action.reason;
+        statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜Exit含 Fib Extension`;
     }
 
     function updateTechnicalChart(closes) {
