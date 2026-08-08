@@ -19,6 +19,7 @@
     <!-- 引入 Chart.js 視覺化圖表庫 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="stock-list.js"></script>
+    <script src="fundamentals-data.js"></script>
     <style>
         :root {
             --bg-color: #0b0e14;
@@ -1957,41 +1958,8 @@
         return suffix && !text.endsWith(suffix) ? `${text}${suffix}` : text;
     }
 
-    async function fetchTpexFundamentals(stockNo) {
-        // TPEx OpenAPI 對 GitHub Pages / Safari 直接跨站 fetch 可能被 CORS / WAF 阻擋。
-        // 沿用歷史股價已驗證可用的 CORS fallback：直連 → AllOrigins → corsproxy.io。
-        const url = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis';
-        const payload = await fetchJsonWithCorsFallback(url, 12000);
-        const data = Array.isArray(payload)
-            ? payload
-            : (Array.isArray(payload?.data) ? payload.data
-            : (Array.isArray(payload?.aaData) ? payload.aaData : []));
-        if (!Array.isArray(data) || data.length === 0) return null;
-
-        const row = data.find(item => {
-            const code = getObjectValueByAliases(item,
-                ['SecuritiesCompanyCode', 'SecuritiesCode', 'SecuritiesCompanyCode ', 'Code', 'stock_id', '股票代號', '證券代號'],
-                key => /code|代號/i.test(key));
-            return String(code || '').trim().toUpperCase() === String(stockNo).toUpperCase();
-        });
-        if (!row) return null;
-
-        const per = getObjectValueByAliases(row,
-            ['PriceEarningRatio', 'PERatio', 'PEratio', 'PE Ratio', '本益比'],
-            key => /price.*earning.*ratio|本益比/i.test(key));
-        const yieldVal = getObjectValueByAliases(row,
-            ['DividendYield', 'DividendYieldRatio', 'Yield', 'YieldRatio', '殖利率(%)', '殖利率'],
-            key => /dividend.*yield|殖利率/i.test(key));
-        const pbr = getObjectValueByAliases(row,
-            ['PriceBookRatio', 'PriceBookValueRatio', 'PBRatio', 'PBratio', 'PB Ratio', '股價淨值比', '股價淨值比(%)'],
-            key => /price.*book.*ratio|股價淨值比/i.test(key));
-        const dateVal = getObjectValueByAliases(row,
-            ['Date', 'DataDate', 'TradeDate', '資料日期', '日期'],
-            key => /date|日期/i.test(key));
-
-        return { per, yieldVal, pbr, dateVal };
-    }
-
+    /* 💰 基本面：改用每日 Python Builder 產生的靜態 fundamentals-data.js。
+       網頁執行時不再跨網域呼叫 TWSE / TPEx，因此 iPad / Safari / GitHub Pages 不受 CORS 影響。 */
     async function fetchFundamentals(portfolioName) {
         const statusEl = document.getElementById('fundStatusText');
         const titleEl = document.getElementById('fundStockTitle');
@@ -2011,57 +1979,31 @@
             return;
         }
 
-        const market = getStockMarket(stockNo);
         const marketDisplay = getStockMarketDisplay(stockNo);
-        statusEl.textContent = `📡 [${marketDisplay}] 擷取「${stockNo}」基本面資料中...`;
+        statusEl.textContent = `📚 [${marketDisplay}] 查詢本機基本面資料庫「${stockNo}」...`;
 
         try {
-            if (market === 'TPEx') {
-                const metrics = await fetchTpexFundamentals(stockNo);
-                if (!metrics) {
-                    statusEl.textContent = `⚠️ TPEx 近期找不到「${stockNo}」的本益比/殖利率資料。`;
-                    return;
-                }
+            const metrics = (typeof lookupFundamentals === 'function')
+                ? lookupFundamentals(stockNo)
+                : (typeof FUNDAMENTALS_DATA !== 'undefined'
+                    ? FUNDAMENTALS_DATA[String(stockNo).trim().toUpperCase()]
+                    : null);
 
-                perEl.textContent = cleanMetricValue(metrics.per);
-                pbrEl.textContent = cleanMetricValue(metrics.pbr);
-                yieldEl.textContent = cleanMetricValue(metrics.yieldVal, '%');
-                statusEl.textContent = `✅ [TPEx 上櫃] 官方基本面資料${metrics.dateVal ? `｜資料日期：${metrics.dateVal}` : ''}（本益比 N/A 代表無法計算）`;
+            if (!metrics) {
+                const generated = (typeof FUNDAMENTALS_DATABASE_META !== 'undefined' && FUNDAMENTALS_DATABASE_META.generatedAt)
+                    ? `｜資料庫更新：${FUNDAMENTALS_DATABASE_META.generatedAt}` : '';
+                statusEl.textContent = `⚠️ [${marketDisplay}] 靜態基本面資料庫找不到「${stockNo}」${generated}。請執行 Python Builder 更新 fundamentals-data.js。`;
                 return;
             }
 
-            const candidateDates = getRecentDateCandidates(10);
-            let found = false;
-            for (const dateStr of candidateDates) {
-                const url = `https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU?response=json&date=${dateStr}&stockNo=${stockNo}`;
-                const res = await fetch(url, { cache: 'no-store' });
-                const json = await res.json();
-
-                if (json && json.stat === 'OK' && Array.isArray(json.data) && json.data.length > 0) {
-                    const fields = json.fields || [];
-                    const idxYield = fields.findIndex(f => f.includes('殖利率'));
-                    const idxPER = fields.findIndex(f => f.includes('本益比'));
-                    const idxPBR = fields.findIndex(f => f.includes('股價淨值比'));
-                    const row = json.data[0];
-
-                    const yieldVal = idxYield >= 0 ? row[idxYield] : '--';
-                    const perVal = idxPER >= 0 ? row[idxPER] : '--';
-                    const pbrVal = idxPBR >= 0 ? row[idxPBR] : '--';
-
-                    perEl.textContent = perVal && perVal !== '--' ? perVal : '無資料';
-                    pbrEl.textContent = pbrVal && pbrVal !== '--' ? pbrVal : '無資料';
-                    yieldEl.textContent = yieldVal && yieldVal !== '--' ? `${yieldVal}%` : '無資料';
-                    statusEl.textContent = `✅ 資料日期：${dateStr.slice(0,4)}/${dateStr.slice(4,6)}/${dateStr.slice(6,8)}（本益比為負值代表近四季虧損）`;
-                    found = true;
-                    break;
-                }
-                await new Promise(r => setTimeout(r, 120));
-            }
-
-            if (!found) statusEl.textContent = `⚠️ TWSE 近期找不到「${stockNo}」的本益比/殖利率資料（可能剛上市或非交易日）。`;
+            perEl.textContent = cleanMetricValue(metrics.pe);
+            pbrEl.textContent = cleanMetricValue(metrics.pb);
+            yieldEl.textContent = cleanMetricValue(metrics.yield, '%');
+            const dateText = metrics.date ? `｜資料日期：${metrics.date}` : '';
+            statusEl.textContent = `✅ [${marketDisplay}] 靜態官方基本面資料${dateText}｜來源：${metrics.source || metrics.market || 'Official'}`;
         } catch (error) {
-            console.error('Fundamentals fetch error:', error);
-            statusEl.textContent = `❌ [${marketDisplay}] 基本面資料擷取失敗，請稍後重試。`;
+            console.error('Static fundamentals lookup error:', error);
+            statusEl.textContent = `❌ [${marketDisplay}] 靜態基本面資料讀取失敗，請重新執行 Python Builder。`;
         }
     }
 
