@@ -1,4 +1,4 @@
-const CACHE_NAME = 'equity-cost-engine-v4';
+const CACHE_NAME = 'equity-cost-engine-v5';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
@@ -24,21 +24,50 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for app shell, network-first (with cache fallback) for everything else
-// (e.g. the Chart.js / Google Fonts CDN files), so the app still works offline
-// once those have been loaded at least once.
+// stock-list.js is updated independently from the app code, so always try the
+// network first. If the device is offline, fall back to the last good copy.
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response && response.ok) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+// Other local app-shell files remain cache-first for fast/offline startup.
+// Files not already cached are fetched and saved when possible.
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response && (response.ok || response.type === 'opaque')) {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
+
 self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-          return res;
-        })
-        .catch(() => cached);
-    })
-  );
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  const isStockList =
+    url.origin === self.location.origin &&
+    url.pathname.endsWith('/stock-list.js');
+
+  if (isStockList) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  event.respondWith(cacheFirst(request));
 });
