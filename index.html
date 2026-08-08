@@ -656,63 +656,6 @@
             font-weight: 700;
         }
 
-        /* 圖表卡片區塊 */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .chart-card {
-            background: #090c10;
-            border: 1px solid var(--card-border);
-            border-radius: 4px;
-            padding: 14px;
-            height: 260px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chart-card h3 {
-            margin: 0 0 10px 0;
-            font-size: 0.75rem;
-            color: var(--accent-amber);
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            font-weight: 700;
-        }
-
-        .chart-container {
-            flex: 1;
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-
-        .chart-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .chart-card-header h3 {
-            margin: 0;
-        }
-
-        .chart-card.is-collapsed {
-            height: auto;
-        }
-
-        .chart-card.is-collapsed .chart-container {
-            display: none;
-        }
-
-        .chart-card.is-collapsed .chart-card-header {
-            margin-bottom: 0;
-        }
-
         /* 表格樣式 */
         .table-wrapper {
             overflow-x: auto;
@@ -992,7 +935,7 @@
 
 <div class="container">
     <div class="status-bar">
-        <div><span class="status-indicator"></span>TWSE ODD-LOT ENGINE v2.5.1 // BLOOMBERG LIVE NEWS MODE</div>
+        <div><span class="status-indicator"></span>TWSE ODD-LOT ENGINE v2.5 // BLOOMBERG LIVE NEWS MODE</div>
         <div id="saveStatusTag" style="color: var(--accent-cyan); font-weight: 700;">AUTO-SAVED</div>
     </div>
 
@@ -1195,29 +1138,6 @@
         </div>
     </div>
 
-    <!-- 🔔 價格到價提醒 -->
-    <div class="news-card" id="priceAlertCard">
-        <div class="news-header-title">
-            <h3>🔔 PRICE ALERT // <span id="alertStockTitle">聯發科 (2454)</span> 價格到價提醒</h3>
-            <button class="btn-collapse-toggle" id="priceAlertCollapseBtn" onclick="toggleCardCollapse('priceAlertCard','priceAlertCollapseBtn')">▲ 收合</button>
-        </div>
-        <div class="card-body">
-            <div class="config-grid">
-                <div class="config-item">
-                    <label for="alertBuyPrice">[BUY ALERT // 目標買進價]</label>
-                    <input type="number" id="alertBuyPrice" step="any" placeholder="0" oninput="calculate()">
-                </div>
-                <div class="config-item">
-                    <label for="alertSellPrice">[SELL ALERT // 目標賣出價]</label>
-                    <input type="number" id="alertSellPrice" step="any" placeholder="0" oninput="calculate()">
-                </div>
-            </div>
-            <div id="alertBuyStatus" class="cross-alert none">尚未設定目標買進價</div>
-            <div id="alertSellStatus" class="cross-alert none" style="margin-top: 8px;">尚未設定目標賣出價</div>
-            <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 8px;">比對對象為上方「MKT PRICE // 股票/指數現價」欄位，設定的目標價會隨組合一起自動儲存</div>
-        </div>
-    </div>
-
     <!-- 📊 延伸分析：52週高低 / 報酬率 / 大盤比較 -->
     <div class="news-card">
         <div class="news-header-title">
@@ -1228,19 +1148,6 @@
             <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">此區塊需額外抓取約一年份資料，點擊上方按鈕載入（載入需要幾秒鐘）</div>
         </div>
     </div>
-
-    <div class="charts-grid">
-        <div class="chart-card" id="posBreakdownCard">
-            <div class="chart-card-header">
-                <h3>POSITION BREAKDOWN // 各筆交易資金與損益</h3>
-                <button class="btn-collapse-toggle" id="posBreakdownCollapseBtn" onclick="toggleCardCollapse('posBreakdownCard','posBreakdownCollapseBtn')">▲ 收合</button>
-            </div>
-            <div class="chart-container">
-                <canvas id="allocationChart"></canvas>
-            </div>
-        </div>
-    </div>
-
 
     <div class="table-wrapper">
         <table>
@@ -1273,7 +1180,7 @@
     </div>
 
     <div class="footer">
-        POWERED BY BLOOMBERG TERMINAL STYLE FINANCIAL ENGINE V2.5.1
+        POWERED BY BLOOMBERG TERMINAL STYLE FINANCIAL ENGINE V10.0
     </div>
 </div>
 
@@ -1290,7 +1197,6 @@
     const BASE_FEE_RATE = 0.001425;
     const TAX_RATE = 0.003;
 
-    let allocationChartInstance = null;
     let newsDebounceTimer = null;
 
     /* 🪙 投硬幣音效 */
@@ -2271,7 +2177,6 @@
         const portfolioName = document.getElementById('portfolioName').value.trim() || '未命名組合 (Draft)';
         updatePortfolioStockMeta(portfolioName);
         document.getElementById('displayPortfolioBadge').textContent = `PORTFOLIO: ${portfolioName}`;
-        document.getElementById('alertStockTitle').textContent = portfolioName;
         
         // 防抖動：當使用者停止輸入 600ms 後再自動搜尋新聞、均線、基本面與籌碼面，避免頻繁發送請求
         clearTimeout(newsDebounceTimer);
@@ -2284,49 +2189,11 @@
         calculate();
     }
 
-    function initCharts() {
-        const ctxAlloc = document.getElementById('allocationChart').getContext('2d');
-        allocationChartInstance = new Chart(ctxAlloc, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: [
-                    {
-                        label: '買入金額 ($)',
-                        data: [],
-                        backgroundColor: '#06b6d4',
-                        borderRadius: 3
-                    },
-                    {
-                        label: '估計損益 ($)',
-                        data: [],
-                        backgroundColor: [],
-                        borderRadius: 3
-                    }
-                ]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
-                },
-                scales: {
-                    x: { ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, grid: { color: '#1e2638' } },
-                    y: { ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, grid: { color: '#1e2638' } }
-                }
-            }
-        });
-    }
-
     function getCurrentState() {
         const portfolioName = document.getElementById('portfolioName').value || '台積電 (2330)';
         const marketPrice = parseFloat(document.getElementById('marketPrice').value) || 0;
         const discount = parseFloat(document.getElementById('discount').value) || 0.3;
         const minFee = parseFloat(document.getElementById('minFee').value) || 0;
-        const alertBuyPrice = parseFloat(document.getElementById('alertBuyPrice').value) || 0;
-        const alertSellPrice = parseFloat(document.getElementById('alertSellPrice').value) || 0;
         const rows = document.querySelectorAll('#tradeTableBody tr');
         
         const rowData = [];
@@ -2337,7 +2204,7 @@
             rowData.push({ price, qty, hidden });
         });
 
-        return { portfolioName, marketPrice, discount, minFee, alertBuyPrice, alertSellPrice, rows: rowData };
+        return { portfolioName, marketPrice, discount, minFee, rows: rowData };
     }
 
     function restoreState(state, defaultNameFallback = '') {
@@ -2354,11 +2221,8 @@
         document.getElementById('marketPrice').value = state.marketPrice !== undefined ? state.marketPrice : 0;
         document.getElementById('discount').value = state.discount !== undefined ? state.discount : 0.3;
         document.getElementById('minFee').value = state.minFee !== undefined ? state.minFee : 20;
-        document.getElementById('alertBuyPrice').value = state.alertBuyPrice ? state.alertBuyPrice : '';
-        document.getElementById('alertSellPrice').value = state.alertSellPrice ? state.alertSellPrice : '';
 
         document.getElementById('displayPortfolioBadge').textContent = `PORTFOLIO: ${targetName}`;
-        document.getElementById('alertStockTitle').textContent = targetName;
         fetchStockNews(targetName);
         fetchMovingAverages(targetName);
         fetchFundamentals(targetName);
@@ -2508,7 +2372,6 @@
     }
 
     function init() {
-        initCharts();
         renderPresetDropdown();
 
         const lastSaved = JSON.parse(localStorage.getItem(STORAGE_KEY_LAST) || 'null');
@@ -2665,10 +2528,6 @@
         let totalBuyFee = 0;
         let totalBuyCost = 0;
 
-        const rowLabels = [];
-        const rowCosts = [];
-        const rowPnLs = [];
-        const rowPnLColors = [];
 
         rows.forEach((row, idx) => {
             const posIndexText = `#${idx + 1}`;
@@ -2713,10 +2572,6 @@
                 totalBuyFee += buyFee;
                 totalBuyCost += rowTotalCost;
 
-                rowLabels.push(`POS ${posIndexText}`);
-                rowCosts.push(rowTotalCost);
-                rowPnLs.push(positionPnL);
-                rowPnLColors.push(positionPnL >= 0 ? '#ff3b30' : '#34c759');
             }
         });
 
@@ -2749,55 +2604,12 @@
             totalPnLElem.textContent = '$0 (0.00%)';
         }
 
-        updateCharts(rowLabels, rowCosts, rowPnLs, rowPnLColors);
-        updatePriceAlerts(marketPrice);
 
         if (triggerAutoSave) {
             autoSave();
         }
     }
 
-    /* 🔔 價格到價提醒：比對「目標買進價/賣出價」與 MKT PRICE 欄位現價 */
-    function updatePriceAlerts(marketPrice) {
-        const buyTarget = parseFloat(document.getElementById('alertBuyPrice').value) || 0;
-        const sellTarget = parseFloat(document.getElementById('alertSellPrice').value) || 0;
-        const buyBox = document.getElementById('alertBuyStatus');
-        const sellBox = document.getElementById('alertSellStatus');
-
-        if (!buyTarget || buyTarget <= 0) {
-            buyBox.className = 'cross-alert none';
-            buyBox.textContent = '尚未設定目標買進價';
-        } else if (marketPrice > 0 && marketPrice <= buyTarget) {
-            buyBox.className = 'cross-alert alert-buy-hit';
-            buyBox.textContent = `🔔 現價 $${formatNumber(marketPrice, 2)} 已到達目標買進價 $${formatNumber(buyTarget, 2)}，可考慮進場`;
-        } else {
-            const diffPct = marketPrice > 0 ? ((marketPrice - buyTarget) / buyTarget) * 100 : 0;
-            buyBox.className = 'cross-alert none';
-            buyBox.textContent = `距目標買進價 $${formatNumber(buyTarget, 2)} 還差 ${formatNumber(diffPct, 2)}%（現價需再下跌才會觸價）`;
-        }
-
-        if (!sellTarget || sellTarget <= 0) {
-            sellBox.className = 'cross-alert none';
-            sellBox.textContent = '尚未設定目標賣出價';
-        } else if (marketPrice > 0 && marketPrice >= sellTarget) {
-            sellBox.className = 'cross-alert alert-sell-hit';
-            sellBox.textContent = `🔔 現價 $${formatNumber(marketPrice, 2)} 已到達目標賣出價 $${formatNumber(sellTarget, 2)}，可考慮出場`;
-        } else {
-            const diffPct = marketPrice > 0 ? ((sellTarget - marketPrice) / marketPrice) * 100 : 0;
-            sellBox.className = 'cross-alert none';
-            sellBox.textContent = `距目標賣出價 $${formatNumber(sellTarget, 2)} 還差 ${formatNumber(diffPct, 2)}%（現價需再上漲才會觸價）`;
-        }
-    }
-
-    function updateCharts(rowLabels, rowCosts, rowPnLs, rowPnLColors) {
-        if (!allocationChartInstance) return;
-
-        allocationChartInstance.data.labels = rowLabels;
-        allocationChartInstance.data.datasets[0].data = rowCosts;
-        allocationChartInstance.data.datasets[1].data = rowPnLs;
-        allocationChartInstance.data.datasets[1].backgroundColor = rowPnLColors;
-        allocationChartInstance.update();
-    }
 
     window.onload = init;
 
