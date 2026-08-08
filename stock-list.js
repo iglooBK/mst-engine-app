@@ -530,25 +530,63 @@ const STOCK_LIST = [
     { code: "00978", name: "台新臺灣AI優息動能", market: "TWSE", type: "ETF" },
     { code: "00979", name: "統一台灣高息動能", market: "TWSE", type: "ETF" },
     { code: "00980", name: "野村臺灣趨勢動能高息", market: "TWSE", type: "ETF" },
-    { code: "00981A", name: "統一台股增長主動式ETF", market: "TWSE", type: "ETF" },
+    { code: "00981A", name: "主動統一台股增長", market: "TWSE", type: "ETF" },
     { code: "009816", name: "凱基台灣TOP50", market: "TWSE", type: "ETF" },
     { code: "00400A", name: "國泰台灣高股息動能主動式ETF", market: "TWSE", type: "ETF" },
     { code: "00401A", name: "摩根台灣優質股息主動式ETF", market: "TWSE", type: "ETF" },
-    { code: "00402A", name: "安聯台灣科技主動式ETF", market: "TWSE", type: "ETF" },
-    { code: "00403A", name: "元大台灣卓越50主動式ETF", market: "TWSE", type: "ETF" },
-    { code: "00404A", name: "野村台灣動能高息主動式ETF", market: "TWSE", type: "ETF" },
-    { code: "00405A", name: "富邦台灣美好主動式ETF", market: "TWSE", type: "ETF" },
-    { code: "00406A", name: "中信TIGA主動式ETF", market: "TWSE", type: "ETF" },
+    { code: "00402A", name: "主動安聯美國科技", market: "TWSE", type: "ETF" },
+    { code: "00403A", name: "主動統一升級50", market: "TWSE", type: "ETF" },
+    { code: "00404A", name: "主動聯博動能50", market: "TWSE", type: "ETF" },
+    { code: "00405A", name: "主動富邦台灣龍耀", market: "TWSE", type: "ETF" },
+    { code: "00406A", name: "主動中信台灣收益", market: "TWSE", type: "ETF" },
+    { code: "00407A", name: "凱基台灣主動式ETF", market: "TWSE", type: "ETF" },
+    { code: "00988A", name: "主動統一全球創新", market: "TWSE", type: "ETF" },
+    { code: "00991A", name: "主動復華未來50", market: "TWSE", type: "ETF" },
 ];
 
 const STOCK_NAME_MAP = Object.create(null);
 const STOCK_INFO_MAP = Object.create(null);
+const STOCK_MARKET_MAP = Object.create(null);
+const STOCK_TYPE_MAP = Object.create(null);
+
+const STOCK_MARKETS = Object.freeze({
+    TWSE: '上市',
+    TPEx: '上櫃'
+});
+
+const STOCK_TYPES = Object.freeze({
+    STOCK: '股票',
+    ETF: 'ETF'
+});
+
+const STOCK_DATABASE_META = Object.freeze({
+    version: '2026-08-08',
+    source: 'TWSE / TPEx official public market data structure; static snapshot maintained by MST Engine',
+    note: '本檔僅作為代碼→名稱與分類的靜態資料庫；不代表即時交易狀態。',
+    updateGuide: '未來只需更新 STOCK_LIST 陣列，核心程式無需修改。'
+});
 
 STOCK_LIST.forEach(item => {
     const code = String(item.code).toUpperCase();
     STOCK_NAME_MAP[code] = item.name;
-    STOCK_INFO_MAP[code] = item;
+    STOCK_INFO_MAP[code] = Object.freeze({
+        code,
+        name: item.name,
+        market: item.market,
+        marketName: STOCK_MARKETS[item.market] || item.market,
+        type: item.type,
+        typeName: STOCK_TYPES[item.type] || item.type,
+        category: `${STOCK_MARKETS[item.market] || item.market}${STOCK_TYPES[item.type] || item.type}`,
+        displayCategory: `[${STOCK_MARKETS[item.market] || item.market}｜${STOCK_TYPES[item.type] || item.type}]`
+    });
+    STOCK_MARKET_MAP[item.market] ||= [];
+    STOCK_TYPE_MAP[item.type] ||= [];
+    STOCK_MARKET_MAP[item.market].push(code);
+    STOCK_TYPE_MAP[item.type].push(code);
 });
+
+Object.keys(STOCK_MARKET_MAP).forEach(k => Object.freeze(STOCK_MARKET_MAP[k]));
+Object.keys(STOCK_TYPE_MAP).forEach(k => Object.freeze(STOCK_TYPE_MAP[k]));
 
 function lookupStockInfo(code) {
     if (!code) return null;
@@ -560,8 +598,43 @@ function lookupStockName(code) {
     return info ? info.name : null;
 }
 
-function formatStockDisplay(code) {
-    const normalized = String(code || "").trim().toUpperCase();
-    const name = lookupStockName(normalized);
-    return name ? `${normalized} ${name}` : normalized;
+function formatStockDisplay(code, includeCategory = false) {
+    const normalized = String(code || '').trim().toUpperCase();
+    const info = lookupStockInfo(normalized);
+    if (!info) return normalized;
+    return includeCategory
+        ? `${normalized} ${info.name} ${info.displayCategory}`
+        : `${normalized} ${info.name}`;
+}
+
+function formatStockCategory(code) {
+    const info = lookupStockInfo(code);
+    return info ? info.displayCategory : '';
+}
+
+function getStockMarketLabel(code) {
+    const info = lookupStockInfo(code);
+    return info ? info.marketName : '';
+}
+
+function getStockTypeLabel(code) {
+    const info = lookupStockInfo(code);
+    return info ? info.typeName : '';
+}
+
+function getStockCatalogStats() {
+    const stats = {
+        total: STOCK_LIST.length,
+        listed: 0,
+        otc: 0,
+        stock: 0,
+        etf: 0
+    };
+    STOCK_LIST.forEach(item => {
+        if (item.market === 'TWSE') stats.listed++;
+        if (item.market === 'TPEx') stats.otc++;
+        if (item.type === 'STOCK') stats.stock++;
+        if (item.type === 'ETF') stats.etf++;
+    });
+    return stats;
 }

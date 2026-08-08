@@ -968,7 +968,25 @@
                 align-items: stretch;
             }
         }
-    </style>
+    
+        .stock-meta-line {
+            min-height: 18px;
+            margin-top: 6px;
+            padding-left: 2px;
+            color: var(--accent-cyan);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .stock-meta-line .meta-market, .stock-meta-line .meta-type {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 2px 6px;
+            border: 1px solid #263754;
+            border-radius: 3px;
+            background: #0a101a;
+        }
+</style>
 </head>
 <body>
 
@@ -1003,6 +1021,7 @@
         <div class="config-item full-width">
             <label for="portfolioName">[PORTFOLIO NAME // 股票/組合名稱]</label>
             <input type="text" id="portfolioName" value="台積電 (2330)" placeholder="輸入代碼會自動帶入名稱（例如 2330 → 2330 台積電）" oninput="updatePortfolioDisplay()">
+            <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
         <div class="config-item">
             <label for="marketPrice">[MKT PRICE // 股票/指數現價]</label>
@@ -2111,6 +2130,7 @@
 
     function updatePortfolioDisplay() {
         const portfolioName = document.getElementById('portfolioName').value.trim() || '未命名組合 (Draft)';
+        updatePortfolioStockMeta(portfolioName);
         document.getElementById('displayPortfolioBadge').textContent = `PORTFOLIO: ${portfolioName}`;
         document.getElementById('alertStockTitle').textContent = portfolioName;
         
@@ -2190,6 +2210,7 @@
             ? formatStockDisplay(targetCode)
             : rawTargetName;
         document.getElementById('portfolioName').value = targetName;
+        updatePortfolioStockMeta(targetName);
         
         document.getElementById('marketPrice').value = state.marketPrice !== undefined ? state.marketPrice : 0;
         document.getElementById('discount').value = state.discount !== undefined ? state.discount : 0.3;
@@ -2392,8 +2413,21 @@
 
         if (input.value.trim().toUpperCase() === raw) {
             input.value = `${raw} ${info.name}`;
+            updatePortfolioStockMeta(input.value);
             updatePortfolioDisplay();
         }
+    }
+
+    function updatePortfolioStockMeta(text) {
+        const meta = document.getElementById('portfolioStockMeta');
+        if (!meta) return;
+        const code = getPortfolioStockCode(text);
+        const info = typeof lookupStockInfo === 'function' ? lookupStockInfo(code) : null;
+        if (!info) {
+            meta.innerHTML = '';
+            return;
+        }
+        meta.innerHTML = `<span class="meta-market">MARKET // ${info.marketName}</span><span class="meta-type">TYPE // ${info.typeName}</span>`;
     }
 
     let stockNameFillTimer = null;
@@ -2403,20 +2437,28 @@
         if (!input) return;
 
         input.addEventListener('input', () => {
+            updatePortfolioStockMeta(input.value);
             clearTimeout(stockNameFillTimer);
             stockNameFillTimer = setTimeout(autoFillStockName, 450);
         });
 
         input.addEventListener('blur', () => {
+            updatePortfolioStockMeta(input.value);
             clearTimeout(stockNameFillTimer);
             autoFillStockName();
         });
     }
 
     function displayPresetName(name) {
-        const code = String(name || '').trim().toUpperCase();
-        if (/^[0-9]{4,6}[A-Z]?$/.test(code)) {
-            return formatStockDisplay(code);
+        const raw = String(name || '').trim();
+        const code = getPortfolioStockCode(raw);
+        const info = typeof lookupStockInfo === 'function' ? lookupStockInfo(code) : null;
+        if (info) {
+            const startsWithCode = raw.toUpperCase().startsWith(code + ' ');
+            const isPureCode = raw.toUpperCase() === code;
+            if (startsWithCode || isPureCode) {
+                return `${code} ${info.name} ${info.displayCategory}`;
+            }
         }
         return name;
     }
