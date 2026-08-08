@@ -192,6 +192,70 @@
             transform: scale(1.04);
         }
 
+        /* PLOUTOS 品牌字標：只影響 Header，不更動資料卡片與版面 */
+        .title-brand-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 4px;
+        }
+        .title-brand-row h1 { margin-bottom: 0; }
+        .ploutos-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px 4px 7px;
+            border: 1px solid rgba(245, 158, 11, 0.55);
+            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(9,12,16,0.35));
+            box-shadow: inset 0 0 12px rgba(245,158,11,0.06), 0 0 10px rgba(245,158,11,0.10);
+            user-select: none;
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        .ploutos-mark {
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #f59e0b;
+            border-radius: 3px;
+            color: #ffd978;
+            font-size: 0.56rem;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            transform: rotate(45deg);
+            box-shadow: 0 0 8px rgba(245,158,11,.55), inset 0 0 7px rgba(245,158,11,.15);
+        }
+        .ploutos-mark > span { transform: rotate(-45deg); }
+        .ploutos-wording { display: flex; flex-direction: column; line-height: 1; }
+        .ploutos-name {
+            color: #f4d27a;
+            font-family: 'Noto Sans TC', 'JetBrains Mono', sans-serif;
+            font-size: 1.04rem;
+            font-weight: 700;
+            letter-spacing: 3.2px;
+            line-height: 1;
+            text-transform: uppercase;
+            text-shadow:
+                0 0 3px rgba(244,210,122,.55),
+                0 0 9px rgba(245,158,11,.20);
+        }
+        .ploutos-tagline {
+            margin-top: 4px;
+            color: #9b7a3d;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.43rem;
+            font-weight: 600;
+            letter-spacing: 1.75px;
+        }
+        .ploutos-brand:hover {
+            transform: translateY(-1px);
+            border-color: #f59e0b;
+            box-shadow: inset 0 0 14px rgba(245,158,11,.10), 0 0 18px rgba(245,158,11,.28);
+        }
+
         /* 控制區塊 */
         .config-grid {
             display: grid;
@@ -959,6 +1023,12 @@
             .bloomberg-text {
                 font-size: 1.6rem;
             }
+            .title-brand-row { gap: 9px; }
+            .ploutos-brand { padding: 3px 8px 3px 6px; gap: 6px; }
+            .ploutos-mark { width: 23px; height: 23px; font-size: 0.49rem; letter-spacing: -0.5px; }
+            .ploutos-name { font-size: 0.86rem; letter-spacing: 2.2px; }
+            .ploutos-tagline { font-size: 0.41rem; letter-spacing: 1px; }
+
             .summary-card {
                 grid-template-columns: repeat(1, 1fr);
             }
@@ -1000,7 +1070,16 @@
 
     <div class="header">
         <div class="header-title">
-            <h1>PRECISION EQUITY COST ENGINE</h1>
+            <div class="title-brand-row">
+                <h1>PRECISION EQUITY COST ENGINE</h1>
+                <div class="ploutos-brand" aria-label="Ploutos Wealth Intelligence">
+                    <span class="ploutos-mark"><span>MST</span></span>
+                    <span class="ploutos-wording">
+                        <span class="ploutos-name">PLOUTOS</span>
+                        <span class="ploutos-tagline">WEALTH INTELLIGENCE</span>
+                    </span>
+                </div>
+            </div>
             <p class="subtitle">TWSE ODD-LOT POSITION & P&L ANALYTICS</p>
             <div class="portfolio-badge" id="displayPortfolioBadge">PORTFOLIO: 台積電 (2330)</div>
         </div>
