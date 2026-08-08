@@ -1195,6 +1195,7 @@
         </div>
     </div>
 
+
     <!-- 📊 延伸分析：52週高低 / 報酬率 / 大盤比較 -->
     <div class="news-card">
         <div class="news-header-title">
@@ -1205,8 +1206,6 @@
             <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">此區塊需額外抓取約一年份資料，點擊上方按鈕載入（載入需要幾秒鐘）</div>
         </div>
     </div>
-    </div>
-
 
     <div class="table-wrapper">
         <table>
@@ -1492,63 +1491,61 @@
         return results;
     }
 
-    /* 📈 TPEx 上櫃歷史行情
-       GitHub Pages / iPad Safari 直接呼叫 TPEx 舊 st43_result.php 可能受到 CORS / 網站防護影響。
-       因此上櫃股票優先使用 Yahoo Finance Chart API 的 .TWO 代號取得 OHLC 日線；
-       若 Yahoo 暫時失敗，再回退至 TPEx 官方個股月成交資訊。 */
-    function yahooChartRowsToCloses(json) {
-        try {
-            const result = json && json.chart && Array.isArray(json.chart.result) ? json.chart.result[0] : null;
-            if (!result || !Array.isArray(result.timestamp) || !result.indicators || !Array.isArray(result.indicators.quote)) return [];
-            const quote = result.indicators.quote[0] || {};
-            const rows = [];
-            result.timestamp.forEach((ts, i) => {
-                const closeVal = Number(quote.close && quote.close[i]);
-                if (!Number.isFinite(closeVal)) return;
-                const highVal = Number(quote.high && quote.high[i]);
-                const lowVal = Number(quote.low && quote.low[i]);
-                const twDate = new Date((Number(ts) + 8 * 3600) * 1000);
-                const yearAD = twDate.getUTCFullYear();
-                const m = twDate.getUTCMonth() + 1;
-                const d = twDate.getUTCDate();
-                rows.push({
-                    date: new Date(yearAD, m - 1, d),
-                    dateStr: `${yearAD}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
-                    close: closeVal,
-                    high: Number.isFinite(highVal) ? highVal : closeVal,
-                    low: Number.isFinite(lowVal) ? lowVal : closeVal
-                });
-            });
-            return rows;
-        } catch (e) {
-            console.error('Yahoo chart parse error:', e);
-            return [];
-        }
-    }
-
-    async function fetchTpexYahooCloses(stockNo, minCount, maxMonthsToTry = 8) {
-        const requestedDays = Math.max(380, Math.ceil(minCount * 2.2), maxMonthsToTry * 40);
-        const period2 = Math.floor(Date.now() / 1000) + 86400 * 2;
-        const period1 = period2 - requestedDays * 86400;
-        const symbol = `${String(stockNo).toUpperCase()}.TWO`;
-        const hosts = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
-
-        for (const host of hosts) {
+    /* 📈 TPEx 上櫃歷史股價：瀏覽器跨網域韌性版
+       1) Yahoo Finance .TWO 日線（直連 / CORS proxy）
+       2) TPEx 官方月資料（直連 / CORS proxy）
+       公開行情資料，不傳送任何使用者私密資料。 */
+    async function fetchJsonWithCorsFallback(targetUrl, timeoutMs = 10000) {
+        const urls = [
+            targetUrl,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+            `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
+        ];
+        let lastError = null;
+        for (const url of urls) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
             try {
-                const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d&events=history&includeAdjustedClose=true`;
-                const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
+                const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = await res.json();
-                const rows = yahooChartRowsToCloses(json);
-                if (rows.length > 0) {
-                    console.info(`TPEx ${stockNo}: Yahoo ${host} 取得 ${rows.length} 個交易日`);
-                    return rows.sort((a, b) => a.date - b.date);
-                }
+                const text = await res.text();
+                const data = JSON.parse(text);
+                clearTimeout(timer);
+                return data;
             } catch (e) {
-                console.warn(`TPEx Yahoo history failed (${host}) for ${stockNo}:`, e);
+                clearTimeout(timer);
+                lastError = e;
+                console.warn('CORS fallback failed:', url, e);
             }
         }
-        return [];
+        throw lastError || new Error('All CORS sources failed');
+    }
+
+    async function fetchTpexYahooCloses(stockNo, minCount) {
+        const range = minCount > 200 ? '2y' : '6mo';
+        const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stockNo)}.TWO?range=${range}&interval=1d&events=history&includeAdjustedClose=true`;
+        const json = await fetchJsonWithCorsFallback(target, 12000);
+        const result = json?.chart?.result?.[0];
+        if (!result || !Array.isArray(result.timestamp)) return [];
+        const quote = result.indicators?.quote?.[0] || {};
+        const rows = result.timestamp.map((ts, i) => {
+            const closeVal = Number(quote.close?.[i]);
+            const highVal = Number(quote.high?.[i]);
+            const lowVal = Number(quote.low?.[i]);
+            if (!Number.isFinite(closeVal)) return null;
+            const date = new Date(ts * 1000);
+            const y = date.getFullYear();
+            const m = date.getMonth() + 1;
+            const d = date.getDate();
+            return {
+                date,
+                dateStr: `${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}`,
+                close: closeVal,
+                high: Number.isFinite(highVal) ? highVal : closeVal,
+                low: Number.isFinite(lowVal) ? lowVal : closeVal
+            };
+        }).filter(Boolean);
+        return rows.sort((a,b) => a.date - b.date);
     }
 
     async function fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry = 8) {
@@ -1557,58 +1554,52 @@
         let year = now.getFullYear();
         let month = now.getMonth() + 1;
         let monthsTried = 0;
-
         while (results.length < minCount && monthsTried < maxMonthsToTry) {
             const rocYear = year - 1911;
             const rocMonth = `${rocYear}/${String(month).padStart(2, '0')}`;
+            const target = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${encodeURIComponent(rocMonth)}&stkno=${encodeURIComponent(stockNo)}`;
             try {
-                const url = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${encodeURIComponent(rocMonth)}&stkno=${encodeURIComponent(stockNo)}`;
-                const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = await res.json();
-                const rows = json && Array.isArray(json.aaData) ? json.aaData : [];
-
+                const json = await fetchJsonWithCorsFallback(target, 10000);
+                const rows = Array.isArray(json?.aaData) ? json.aaData : [];
                 const monthCloses = rows.map(row => {
                     const rocParts = String(row[0] || '').replace(/\s/g, '').split('/');
                     if (rocParts.length < 3) return null;
                     const yearAD = parseInt(rocParts[0], 10) + 1911;
-                    const m = parseInt(rocParts[1], 10);
-                    const d = parseInt(rocParts[2], 10);
+                    const mo = parseInt(rocParts[1], 10);
+                    const day = parseInt(rocParts[2], 10);
                     const closeVal = parseFloat(String(row[6]).replace(/,/g, '').replace(/--/g, ''));
                     const highVal = parseFloat(String(row[4]).replace(/,/g, '').replace(/--/g, ''));
                     const lowVal = parseFloat(String(row[5]).replace(/,/g, '').replace(/--/g, ''));
-                    if (isNaN(closeVal) || isNaN(yearAD) || isNaN(m) || isNaN(d)) return null;
+                    if (!Number.isFinite(closeVal)) return null;
                     return {
-                        date: new Date(yearAD, m - 1, d),
-                        dateStr: `${yearAD}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+                        date: new Date(yearAD, mo - 1, day),
+                        dateStr: `${yearAD}/${String(mo).padStart(2,'0')}/${String(day).padStart(2,'0')}`,
                         close: closeVal,
-                        high: isNaN(highVal) ? closeVal : highVal,
-                        low: isNaN(lowVal) ? closeVal : lowVal
+                        high: Number.isFinite(highVal) ? highVal : closeVal,
+                        low: Number.isFinite(lowVal) ? lowVal : closeVal
                     };
                 }).filter(Boolean);
                 results.unshift(...monthCloses);
             } catch (e) {
-                console.warn('TPEx official history fetch error for', rocMonth, stockNo, e);
+                console.warn('TPEx official history failed:', rocMonth, stockNo, e);
             }
-
             monthsTried++;
             month--;
             if (month === 0) { month = 12; year--; }
-            await new Promise(r => setTimeout(r, 120));
         }
-
         const byDate = new Map();
         results.forEach(item => byDate.set(item.dateStr, item));
-        return Array.from(byDate.values()).sort((a, b) => a.date - b.date);
+        return Array.from(byDate.values()).sort((a,b) => a.date - b.date);
     }
 
     async function fetchTpexRecentCloses(stockNo, minCount, maxMonthsToTry = 8) {
-        const yahooRows = await fetchTpexYahooCloses(stockNo, minCount, maxMonthsToTry);
-        if (yahooRows.length >= Math.min(minCount, 20)) return yahooRows;
-
-        const officialRows = await fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry);
-        if (officialRows.length > 0) return officialRows;
-        return yahooRows;
+        try {
+            const yahoo = await fetchTpexYahooCloses(stockNo, minCount);
+            if (yahoo.length >= Math.min(minCount, 20)) return yahoo;
+        } catch (e) {
+            console.warn('Yahoo .TWO history failed, switching to TPEx official:', stockNo, e);
+        }
+        return fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry);
     }
 
     /* 📈 台股統一入口：自動依 stock-list.js 的 market 分流 TWSE / TPEx */
@@ -1654,7 +1645,7 @@
             const closes = await fetchRecentCloses(stockNo, 65);
 
             if (!closes || closes.length === 0) {
-                statusEl.textContent = getStockMarket(stockNo) === 'TPEx' ? `❌ 無法取得「${stockNo}」上櫃歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。` : `❌ 查無「${stockNo}」歷史股價，請確認股票代碼是否正確。`;
+                statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。`;
                 renderCrossAlert(null);
                 renderSupportResistance(null);
                 renderLatestPrice(null);
@@ -2160,7 +2151,7 @@
             ]);
 
             if (!stockCloses || stockCloses.length === 0) {
-                contentEl.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 查無「${stockNo}」歷史股價，請確認股票代碼是否正確。</div>`;
+                contentEl.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 無法取得「${stockNo}」歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。</div>`;
                 return;
             }
 
@@ -2300,6 +2291,7 @@
         const portfolioName = document.getElementById('portfolioName').value.trim() || '未命名組合 (Draft)';
         updatePortfolioStockMeta(portfolioName);
         document.getElementById('displayPortfolioBadge').textContent = `PORTFOLIO: ${portfolioName}`;
+        document.getElementById('alertStockTitle').textContent = portfolioName;
         
         // 防抖動：當使用者停止輸入 600ms 後再自動搜尋新聞、均線、基本面與籌碼面，避免頻繁發送請求
         clearTimeout(newsDebounceTimer);
