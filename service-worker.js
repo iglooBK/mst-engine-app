@@ -1,7 +1,8 @@
-const CACHE_NAME = 'equity-cost-engine-v1';
+const CACHE_NAME = 'equity-cost-engine-v2';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
+  './stock-list.js',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png'

@@ -18,6 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- 引入 Chart.js 視覺化圖表庫 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="stock-list.js"></script>
     <style>
         :root {
             --bg-color: #0b0e14;
@@ -1001,7 +1002,7 @@
     <div class="config-grid">
         <div class="config-item full-width">
             <label for="portfolioName">[PORTFOLIO NAME // 股票/組合名稱]</label>
-            <input type="text" id="portfolioName" value="台積電 (2330)" placeholder="輸入純代碼會自動帶入名稱 (例如輸入 2454 自動變成 2454 聯發科)" oninput="updatePortfolioDisplay()">
+            <input type="text" id="portfolioName" value="台積電 (2330)" placeholder="輸入代碼會自動帶入名稱（例如 2330 → 2330 台積電）" oninput="updatePortfolioDisplay()">
         </div>
         <div class="config-item">
             <label for="marketPrice">[MKT PRICE // 股票/指數現價]</label>
@@ -1421,7 +1422,7 @@
     /* 📈 從股票/組合名稱中擷取股票代碼 (支援 4~6 碼數字) */
     function extractStockCode(portfolioName) {
         if (!portfolioName) return null;
-        const match = portfolioName.match(/(\d{4,6})/);
+        const match = portfolioName.toUpperCase().match(/([0-9]{4,6}[A-Z]?)/);
         return match ? match[1] : null;
     }
 
@@ -2183,7 +2184,11 @@
     function restoreState(state, defaultNameFallback = '') {
         if (!state) return;
 
-        const targetName = state.portfolioName || defaultNameFallback || '台積電 (2330)';
+        const rawTargetName = state.portfolioName || defaultNameFallback || '台積電 (2330)';
+        const targetCode = String(rawTargetName).trim().toUpperCase();
+        const targetName = (/^[0-9]{4,6}[A-Z]?$/.test(targetCode) && typeof lookupStockName === 'function' && lookupStockName(targetCode))
+            ? formatStockDisplay(targetCode)
+            : rawTargetName;
         document.getElementById('portfolioName').value = targetName;
         
         document.getElementById('marketPrice').value = state.marketPrice !== undefined ? state.marketPrice : 0;
@@ -2222,18 +2227,22 @@
     function renderPresetDropdown() {
         const select = document.getElementById('presetSelect');
         const presets = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESETS) || '{}');
-        
+
         select.innerHTML = '<option value="">-- 當前草稿 (Draft) --</option>';
         Object.keys(presets).forEach(name => {
             const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
+            opt.value = name; // 保留原始名稱作為 localStorage key
+            opt.textContent = displayPresetName(name);
             select.appendChild(opt);
         });
     }
 
     function saveAsNewPreset() {
-        const defaultName = document.getElementById('portfolioName').value.trim() || '台積電 (2330)';
+        const rawCurrentName = document.getElementById('portfolioName').value.trim() || '台積電 (2330)';
+        const currentCode = getPortfolioStockCode(rawCurrentName);
+        const defaultName = (/^[0-9]{4,6}[A-Z]?$/.test(rawCurrentName) && lookupStockName(currentCode))
+            ? formatStockDisplay(currentCode)
+            : rawCurrentName;
         const name = prompt('請輸入此股票/組合名稱：', defaultName);
         if (!name || name.trim() === '') return;
         
@@ -2349,123 +2358,71 @@
             restoreState({ portfolioName: '台積電 (2330)', marketPrice: 1800, discount: 0.3, minFee: 20, rows: defaultInitialData });
         }
 
-        // 📇 啟動股票代碼→名稱自動帶入功能
+        // 📇 啟動本地靜態股票代碼→名稱自動帶入功能
         setupStockNameAutoFill();
-        loadStockNameMap();
+        migrateAndRefreshPresetLabels();
     }
 
     /* ============================================================
-       📇 股票代碼 → 股票名稱 自動帶入功能
-       原理：背景抓取「TWSE 上市」+「TPEx 上櫃」全市場代碼/名稱清單，
-       快取在 localStorage（24小時內不重抓），使用者在 PORTFOLIO NAME
-       欄位只輸入純代碼（例如 2330）時，自動補上名稱變成「2330 台積電」。
-       若使用者輸入的內容已包含中文或其他文字，視為自訂名稱，不會覆蓋。
+       📇 股票代碼 → 股票名稱自動帶入
+       ------------------------------------------------------------
+       完全使用 stock-list.js 的本地靜態資料：
+       - 不呼叫 TWSE / TPEx API
+       - 不依賴 CORS
+       - 不會因為 API 被擋而失效
+       - 只在輸入「純代碼」時自動補名稱
+       - 已有自訂名稱的組合不會被覆蓋
        ============================================================ */
-    let stockNameMap = null;
-    const STOCK_NAME_CACHE_KEY = 'twStockNameMapCache_v1';
-    const STOCK_NAME_CACHE_TTL = 24 * 60 * 60 * 1000; // 快取 24 小時
 
-    function buildNameMap(arr, codeKeys, nameKeys) {
-        const map = {};
-        if (!Array.isArray(arr)) return map;
-        arr.forEach(item => {
-            let code = null, name = null;
-            for (const k of codeKeys) {
-                if (item && item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') {
-                    code = String(item[k]).trim();
-                    break;
-                }
-            }
-            for (const k of nameKeys) {
-                if (item && item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') {
-                    name = String(item[k]).trim();
-                    break;
-                }
-            }
-            if (code && name) map[code] = name;
-        });
-        return map;
-    }
-
-    async function loadStockNameMap() {
-        // 先用本地快取（24小時內）讓功能立即可用
-        try {
-            const cached = JSON.parse(localStorage.getItem(STOCK_NAME_CACHE_KEY) || 'null');
-            if (cached && cached.map && Object.keys(cached.map).length > 0) {
-                stockNameMap = cached.map;
-            }
-        } catch (e) { /* 忽略快取讀取錯誤 */ }
-
-        try {
-            const cachedMeta = JSON.parse(localStorage.getItem(STOCK_NAME_CACHE_KEY) || 'null');
-            if (cachedMeta && cachedMeta.ts && (Date.now() - cachedMeta.ts < STOCK_NAME_CACHE_TTL)) {
-                return; // 快取仍新鮮，不重新抓取
-            }
-        } catch (e) { /* ignore */ }
-
-        // 背景抓取最新的上市 + 上櫃股票代碼/名稱清單
-        try {
-            const [twseRes, tpexRes] = await Promise.allSettled([
-                fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL').then(r => r.json()),
-                fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes').then(r => r.json())
-            ]);
-
-            const twseMap = twseRes.status === 'fulfilled'
-                ? buildNameMap(twseRes.value, ['Code'], ['Name'])
-                : {};
-            const tpexMap = tpexRes.status === 'fulfilled'
-                ? buildNameMap(tpexRes.value, ['SecuritiesCompanyCode', 'CompanyCode', 'Code'], ['CompanyName', 'Name', 'SecuritiesName'])
-                : {};
-
-            const merged = Object.assign({}, tpexMap, twseMap); // 代碼萬一重複，以上市資料為主
-            if (Object.keys(merged).length > 0) {
-                stockNameMap = merged;
-                localStorage.setItem(STOCK_NAME_CACHE_KEY, JSON.stringify({ ts: Date.now(), map: merged }));
-            }
-        } catch (e) {
-            console.warn('股票代碼對照表更新失敗，將沿用快取資料（若有）', e);
-        }
+    function getPortfolioStockCode(text) {
+        if (!text) return null;
+        const match = String(text).trim().toUpperCase().match(/(?:^|\s|\()([0-9]{4,6}[A-Z]?)(?=\s|\)|$)/);
+        return match ? match[1] : null;
     }
 
     function autoFillStockName() {
         const input = document.getElementById('portfolioName');
         if (!input) return;
-        const raw = input.value.trim();
 
-        // 只有「純代碼」(4~6碼數字，不含其他文字) 才自動補上名稱；
-        // 已包含中文或其他字元代表使用者自訂了名稱，不覆蓋。
-        if (!/^\d{4,6}$/.test(raw)) return;
+        const raw = input.value.trim().toUpperCase();
+        if (!/^[0-9]{4,6}[A-Z]?$/.test(raw)) return;
 
-        const applyName = () => {
-            if (stockNameMap && stockNameMap[raw] && input.value.trim() === raw) {
-                input.value = `${raw} ${stockNameMap[raw]}`;
-                updatePortfolioDisplay();
-            }
-        };
+        const info = lookupStockInfo(raw);
+        if (!info) return;
 
-        if (stockNameMap) {
-            applyName();
-        } else {
-            loadStockNameMap().then(applyName).catch(() => {});
+        if (input.value.trim().toUpperCase() === raw) {
+            input.value = `${raw} ${info.name}`;
+            updatePortfolioDisplay();
         }
     }
 
     let stockNameFillTimer = null;
+
     function setupStockNameAutoFill() {
         const input = document.getElementById('portfolioName');
         if (!input) return;
 
-        // 打字停頓 700ms 後自動嘗試帶入名稱
         input.addEventListener('input', () => {
             clearTimeout(stockNameFillTimer);
-            stockNameFillTimer = setTimeout(autoFillStockName, 700);
+            stockNameFillTimer = setTimeout(autoFillStockName, 450);
         });
 
-        // 離開欄位（例如按 Tab 或點別的地方）時也立即嘗試一次
         input.addEventListener('blur', () => {
             clearTimeout(stockNameFillTimer);
             autoFillStockName();
         });
+    }
+
+    function displayPresetName(name) {
+        const code = String(name || '').trim().toUpperCase();
+        if (/^[0-9]{4,6}[A-Z]?$/.test(code)) {
+            return formatStockDisplay(code);
+        }
+        return name;
+    }
+
+    function migrateAndRefreshPresetLabels() {
+        renderPresetDropdown();
     }
 
     function addRow() {
