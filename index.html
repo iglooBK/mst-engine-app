@@ -20,6 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="stock-list.js"></script>
     <script src="fundamentals-data.js"></script>
+    <script src="dividend-data.js"></script>
     <style>
         :root {
             --bg-color: #0b0e14;
@@ -1156,6 +1157,30 @@
                 <div class="value" id="fundYield">--</div>
             </div>
         </div>
+
+        <div style="margin-top:14px; border-top:1px solid #1a2234; padding-top:10px;">
+            <div style="font-size:0.74rem; color:var(--accent-cyan); font-weight:800; letter-spacing:0.5px; margin-bottom:7px;">
+                💵 3-YEAR DIVIDEND / EX-RIGHTS // 近3年除權息與發放資訊
+            </div>
+            <div id="dividendStatusText" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:7px;">尚未載入</div>
+            <div style="overflow-x:auto; border:1px solid var(--card-border); border-radius:4px;">
+                <table class="returns-table" style="margin-top:0; min-width:760px;">
+                    <thead>
+                        <tr>
+                            <th>年度</th>
+                            <th>除權息日</th>
+                            <th>現金股利</th>
+                            <th>現金發放日</th>
+                            <th>股票股利</th>
+                            <th>股票發放日</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dividendHistoryBody">
+                        <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">--</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- 🎯 支撐/壓力價位 -->
@@ -1960,6 +1985,59 @@
 
     /* 💰 基本面：改用每日 Python Builder 產生的靜態 fundamentals-data.js。
        網頁執行時不再跨網域呼叫 TWSE / TPEx，因此 iPad / Safari / GitHub Pages 不受 CORS 影響。 */
+    function getStockTypeForUI(stockNo) {
+        try {
+            if (typeof lookupStockInfo === 'function') {
+                const info = lookupStockInfo(stockNo);
+                if (info && info.type) return info.type;
+            }
+            if (typeof STOCK_INFO_MAP !== 'undefined') {
+                const info = STOCK_INFO_MAP[String(stockNo).trim().toUpperCase()];
+                if (info && info.type) return info.type;
+            }
+        } catch (e) {}
+        return 'STOCK';
+    }
+
+    function renderDividendHistory(stockNo) {
+        const body = document.getElementById('dividendHistoryBody');
+        const status = document.getElementById('dividendStatusText');
+        if (!body || !status) return;
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">--</td></tr>';
+        let rows = [];
+        try {
+            rows = (typeof lookupDividendHistory === 'function')
+                ? lookupDividendHistory(stockNo)
+                : (typeof DIVIDEND_DATA !== 'undefined' ? (DIVIDEND_DATA[String(stockNo).trim().toUpperCase()] || []) : []);
+        } catch (e) {
+            console.error('Dividend static lookup error:', e);
+        }
+        if (!rows || rows.length === 0) {
+            const generated = (typeof DIVIDEND_DATABASE_META !== 'undefined' && DIVIDEND_DATABASE_META.generatedAt)
+                ? `｜資料庫更新：${DIVIDEND_DATABASE_META.generatedAt}` : '';
+            status.textContent = `近3年查無已公告除權息/配息紀錄${generated}`;
+            return;
+        }
+        body.innerHTML = rows.map(r => {
+            const cash = (!r.cash || r.cash === '0' || r.cash === '--') ? '--' : `${r.cash}`;
+            const stock = (!r.stock || r.stock === '0' || r.stock === '--') ? '--' : `${r.stock}`;
+            const cashPay = r.cashPayDate || '--';
+            const stockPay = r.stockPayDate || '--';
+            const year = r.year || (r.exDate ? String(r.exDate).slice(0, 4) : '--');
+            return `<tr>
+                <td style="text-align:center; white-space:nowrap; font-weight:700; color:var(--text-secondary);">${year}</td>
+                <td style="text-align:center; white-space:nowrap;">${r.exDate || '--'}</td>
+                <td style="text-align:center; color:var(--profit-color); font-weight:700;">${cash}</td>
+                <td style="text-align:center; white-space:nowrap;">${cashPay}</td>
+                <td style="text-align:center; color:var(--accent-cyan); font-weight:700;">${stock}</td>
+                <td style="text-align:center; white-space:nowrap;">${stockPay}</td>
+            </tr>`;
+        }).join('');
+        const metaYears = (typeof DIVIDEND_DATABASE_META !== 'undefined' && DIVIDEND_DATABASE_META.years)
+            ? DIVIDEND_DATABASE_META.years.join(' / ') : '近3年';
+        status.textContent = `✅ ${metaYears}｜${rows.length} 筆已公告除權息/配息紀錄`;
+    }
+
     async function fetchFundamentals(portfolioName) {
         const statusEl = document.getElementById('fundStatusText');
         const titleEl = document.getElementById('fundStockTitle');
@@ -1976,10 +2054,13 @@
         const stockNo = extractStockCode(cleanName);
         if (!stockNo) {
             statusEl.textContent = '⚠️ 未偵測到股票代碼';
+            renderDividendHistory('');
             return;
         }
 
         const marketDisplay = getStockMarketDisplay(stockNo);
+        const stockType = getStockTypeForUI(stockNo);
+        renderDividendHistory(stockNo);
         statusEl.textContent = `📚 [${marketDisplay}] 查詢本機基本面資料庫「${stockNo}」...`;
 
         try {
@@ -1990,9 +2071,13 @@
                     : null);
 
             if (!metrics) {
-                const generated = (typeof FUNDAMENTALS_DATABASE_META !== 'undefined' && FUNDAMENTALS_DATABASE_META.generatedAt)
-                    ? `｜資料庫更新：${FUNDAMENTALS_DATABASE_META.generatedAt}` : '';
-                statusEl.textContent = `⚠️ [${marketDisplay}] 靜態基本面資料庫找不到「${stockNo}」${generated}。請執行 Python Builder 更新 fundamentals-data.js。`;
+                if (stockType === 'ETF') {
+                    statusEl.textContent = `ℹ️ [${marketDisplay}｜ETF] ETF 通常無個股型 P/E、P/B；下方提供近3年配息／除息與發放資訊。`;
+                } else {
+                    const generated = (typeof FUNDAMENTALS_DATABASE_META !== 'undefined' && FUNDAMENTALS_DATABASE_META.generatedAt)
+                        ? `｜資料庫更新：${FUNDAMENTALS_DATABASE_META.generatedAt}` : '';
+                    statusEl.textContent = `⚠️ [${marketDisplay}] 靜態基本面資料庫找不到「${stockNo}」${generated}。請執行 Python Builder 更新 fundamentals-data.js。`;
+                }
                 return;
             }
 

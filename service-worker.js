@@ -1,4 +1,4 @@
-const CACHE_NAME = "equity-cost-engine-v10";
+const CACHE_NAME = "equity-cost-engine-v12";
 const STATIC_ASSETS = [
   "./",
   "./manifest.json",
@@ -41,6 +41,7 @@ self.addEventListener("fetch", event => {
       url.pathname.endsWith("/index.html") ||
       url.pathname.endsWith("/stock-list.js") ||
       url.pathname.endsWith("/fundamentals-data.js") ||
+      url.pathname.endsWith("/dividend-data.js") ||
       url.pathname.endsWith("/service-worker.js") ||
       url.pathname.endsWith("/mst-engine-app/")
   )) {
