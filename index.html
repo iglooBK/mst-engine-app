@@ -1255,6 +1255,7 @@
     const BASE_FEE_RATE = 0.001425;
     const TAX_RATE = 0.003;
 
+    let allocationChartInstance = null;
     let newsDebounceTimer = null;
 
     /* 🪙 投硬幣音效 */
@@ -1957,31 +1958,35 @@
     }
 
     async function fetchTpexFundamentals(stockNo) {
+        // TPEx OpenAPI 對 GitHub Pages / Safari 直接跨站 fetch 可能被 CORS / WAF 阻擋。
+        // 沿用歷史股價已驗證可用的 CORS fallback：直連 → AllOrigins → corsproxy.io。
         const url = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis';
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`TPEx fundamentals HTTP ${res.status}`);
-        const data = await res.json();
-        if (!Array.isArray(data)) return null;
+        const payload = await fetchJsonWithCorsFallback(url, 12000);
+        const data = Array.isArray(payload)
+            ? payload
+            : (Array.isArray(payload?.data) ? payload.data
+            : (Array.isArray(payload?.aaData) ? payload.aaData : []));
+        if (!Array.isArray(data) || data.length === 0) return null;
 
         const row = data.find(item => {
             const code = getObjectValueByAliases(item,
-                ['SecuritiesCompanyCode', 'SecuritiesCode', 'Code', '股票代號', '證券代號'],
+                ['SecuritiesCompanyCode', 'SecuritiesCode', 'SecuritiesCompanyCode ', 'Code', 'stock_id', '股票代號', '證券代號'],
                 key => /code|代號/i.test(key));
             return String(code || '').trim().toUpperCase() === String(stockNo).toUpperCase();
         });
         if (!row) return null;
 
         const per = getObjectValueByAliases(row,
-            ['PriceEarningRatio', 'PERatio', 'PEratio', '本益比'],
+            ['PriceEarningRatio', 'PERatio', 'PEratio', 'PE Ratio', '本益比'],
             key => /price.*earning.*ratio|本益比/i.test(key));
         const yieldVal = getObjectValueByAliases(row,
-            ['DividendYield', 'Yield', '殖利率(%)', '殖利率'],
+            ['DividendYield', 'DividendYieldRatio', 'Yield', 'YieldRatio', '殖利率(%)', '殖利率'],
             key => /dividend.*yield|殖利率/i.test(key));
         const pbr = getObjectValueByAliases(row,
-            ['PriceBookRatio', 'PBRatio', 'PBratio', '股價淨值比'],
+            ['PriceBookRatio', 'PriceBookValueRatio', 'PBRatio', 'PBratio', 'PB Ratio', '股價淨值比', '股價淨值比(%)'],
             key => /price.*book.*ratio|股價淨值比/i.test(key));
         const dateVal = getObjectValueByAliases(row,
-            ['Date', 'DataDate', '資料日期'],
+            ['Date', 'DataDate', 'TradeDate', '資料日期', '日期'],
             key => /date|日期/i.test(key));
 
         return { per, yieldVal, pbr, dateVal };
@@ -2304,6 +2309,44 @@
         calculate();
     }
 
+    function initCharts() {
+        const allocationCanvas = document.getElementById('allocationChart');
+        if (!allocationCanvas) return;
+        const ctxAlloc = allocationCanvas.getContext('2d');
+        allocationChartInstance = new Chart(ctxAlloc, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: '買入金額 ($)',
+                        data: [],
+                        backgroundColor: '#06b6d4',
+                        borderRadius: 3
+                    },
+                    {
+                        label: '估計損益 ($)',
+                        data: [],
+                        backgroundColor: [],
+                        borderRadius: 3
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, grid: { color: '#1e2638' } },
+                    y: { ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, grid: { color: '#1e2638' } }
+                }
+            }
+        });
+    }
+
     function getCurrentState() {
         const portfolioName = document.getElementById('portfolioName').value || '台積電 (2330)';
         const marketPrice = parseFloat(document.getElementById('marketPrice').value) || 0;
@@ -2487,6 +2530,7 @@
     }
 
     function init() {
+        initCharts();
         renderPresetDropdown();
 
         const lastSaved = JSON.parse(localStorage.getItem(STORAGE_KEY_LAST) || 'null');
@@ -2727,10 +2771,21 @@
             totalPnLElem.textContent = '$0 (0.00%)';
         }
 
+        updateCharts(rowLabels, rowCosts, rowPnLs, rowPnLColors);
 
         if (triggerAutoSave) {
             autoSave();
         }
+    }
+
+    function updateCharts(rowLabels, rowCosts, rowPnLs, rowPnLColors) {
+        if (!allocationChartInstance) return;
+
+        allocationChartInstance.data.labels = rowLabels;
+        allocationChartInstance.data.datasets[0].data = rowCosts;
+        allocationChartInstance.data.datasets[1].data = rowPnLs;
+        allocationChartInstance.data.datasets[1].backgroundColor = rowPnLColors;
+        allocationChartInstance.update();
     }
 
     window.onload = init;
