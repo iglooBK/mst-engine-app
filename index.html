@@ -390,6 +390,48 @@
             margin-bottom: 0;
         }
 
+        .position-controls {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px 14px;
+            padding: 12px;
+            margin-bottom: 14px;
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+        }
+
+        .position-controls .config-item {
+            min-width: 0;
+        }
+
+        .position-controls .config-item label {
+            display: block;
+            margin: 0;
+            font-size: 0.75rem;
+            line-height: 1.35;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .position-controls .config-item input,
+        .position-controls .config-item select {
+            width: 100%;
+            min-height: 42px;
+        }
+
+        @media (max-width: 680px) {
+            .position-controls {
+                grid-template-columns: 1fr;
+            }
+            .position-controls .config-item label {
+                white-space: normal;
+            }
+        }
+
         /* 總結數據卡片 */
         .summary-card {
             display: grid;
@@ -1650,24 +1692,6 @@
             </div>
             <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
-        <div class="config-item">
-            <label for="marketPrice">[MKT PRICE // 股票/指數現價]</label>
-            <input type="number" id="marketPrice" value="1800" step="any" oninput="calculate()">
-        </div>
-        <div class="config-item">
-            <label for="discount">[COMMISSION // 券商折扣]</label>
-            <select id="discount" onchange="calculate()">
-                <option value="0.28">2.8 折 (0.0399%)</option>
-                <option value="0.3" selected>3 折 (0.04275%)</option>
-                <option value="0.5">5 折 (0.07125%)</option>
-                <option value="0.6">6 折 (0.0855%)</option>
-                <option value="1.0">無折扣 (0.1425%)</option>
-            </select>
-        </div>
-        <div class="config-item">
-            <label for="minFee">[MIN FEE // 單筆最低費 (元)]</label>
-            <input type="number" id="minFee" value="20" min="0" oninput="calculate()">
-        </div>
     </div>
 
     <!-- 📰 BLOOMBERG LIVE NEWS FEED 區塊 -->
@@ -1884,6 +1908,26 @@
     <div class="position-summary-card" id="positionSummaryCard">
         <div class="news-header-title">
             <h3>📌 POSITION SUMMARY // 庫存計算結果</h3>
+        </div>
+        <div class="position-controls">
+            <div class="config-item">
+                <label for="marketPrice">[MKT PRICE // 股票/指數現價]</label>
+                <input type="number" id="marketPrice" value="1800" step="any" oninput="calculate()">
+            </div>
+            <div class="config-item">
+                <label for="discount">[COMMISSION // 券商折扣]</label>
+                <select id="discount" onchange="calculate()">
+                    <option value="0.28">2.8 折 (0.0399%)</option>
+                    <option value="0.3" selected>3 折 (0.04275%)</option>
+                    <option value="0.5">5 折 (0.07125%)</option>
+                    <option value="0.6">6 折 (0.0855%)</option>
+                    <option value="1.0">無折扣 (0.1425%)</option>
+                </select>
+            </div>
+            <div class="config-item">
+                <label for="minFee">[MIN FEE // 單筆最低費 (元)]</label>
+                <input type="number" id="minFee" value="20" min="0" oninput="calculate()">
+            </div>
         </div>
         <div class="summary-card">
             <div class="summary-item">
