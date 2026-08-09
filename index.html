@@ -2517,6 +2517,9 @@
         const prevMa5 = calcSMAAt(closes, 5, 1);
         const prevMa10 = calcSMAAt(closes, 10, 1);
         const prevMa20 = calcSMAAt(closes, 20, 1);
+        const prev2Ma5 = calcSMAAt(closes, 5, 2);
+        const prev2Ma10 = calcSMAAt(closes, 10, 2);
+        const prev2Ma20 = calcSMAAt(closes, 20, 2);
         const cross = detectCross(closes);
 
         const recent20 = closes.slice(-20);
@@ -2525,26 +2528,44 @@
 
         // ===== 1) 均線斜率：MA5 / MA10 / MA20 =====
         // 使用「今日均線 vs 前一交易日均線」判斷上揚 / 下彎。
+        const MIN_MEANINGFUL_MA_SLOPE_PCT = 0.05; // 0.05%, filters floating-point / near-flat noise
         const maSlopeRows = [
-            { label: 'MA5', period: 5, value: ma5, prev: prevMa5 },
-            { label: 'MA10', period: 10, value: ma10, prev: prevMa10 },
-            { label: 'MA20', period: 20, value: ma20, prev: prevMa20 }
+            { label: 'MA5', period: 5, value: ma5, prev: prevMa5, prev2: prev2Ma5 },
+            { label: 'MA10', period: 10, value: ma10, prev: prevMa10, prev2: prev2Ma10 },
+            { label: 'MA20', period: 20, value: ma20, prev: prevMa20, prev2: prev2Ma20 }
         ].map(x => {
             const slopePct = (Number.isFinite(x.value) && Number.isFinite(x.prev) && x.prev !== 0)
                 ? ((x.value - x.prev) / x.prev) * 100
                 : null;
-            return {
-                ...x,
-                slopePct,
-                direction: slopePct === null ? 'flat' : slopePct < -0.0001 ? 'down' : slopePct > 0.0001 ? 'up' : 'flat'
-            };
+            const prevSlopePct = (Number.isFinite(x.prev) && Number.isFinite(x.prev2) && x.prev2 !== 0)
+                ? ((x.prev - x.prev2) / x.prev2) * 100
+                : null;
+
+            // Direction change requires TWO consecutive trading days in the same meaningful direction.
+            // This prevents a nearly-flat MA from flipping Entry logic because of tiny numerical noise.
+            let direction = 'flat';
+            if (Number.isFinite(slopePct) && Number.isFinite(prevSlopePct)) {
+                if (slopePct >= MIN_MEANINGFUL_MA_SLOPE_PCT &&
+                    prevSlopePct >= MIN_MEANINGFUL_MA_SLOPE_PCT) {
+                    direction = 'up';
+                } else if (slopePct <= -MIN_MEANINGFUL_MA_SLOPE_PCT &&
+                           prevSlopePct <= -MIN_MEANINGFUL_MA_SLOPE_PCT) {
+                    direction = 'down';
+                }
+            }
+
+            return { ...x, slopePct, prevSlopePct, direction };
         });
 
         // 只要 MA5 / MA10 / MA20 有下彎，就優先把「下彎均線」當作建倉錨點。
         // 若同時多條下彎，優先採用較長週期（MA20 > MA10 > MA5），
         // 因為對新手而言，中期均線的向下拉力應比短線雜訊更優先處理。
         const downwardMA = maSlopeRows
-            .filter(x => x.direction === 'down' && Number.isFinite(x.value) && x.value > 0 && x.value <= C * 1.012)
+            .filter(x => x.direction === 'down'
+                && Number.isFinite(x.value)
+                && x.value > 0
+                && x.value >= C * 0.85
+                && x.value <= C * 1.012)
             .sort((a, b) => b.period - a.period);
 
         const priorityMA = downwardMA.length ? downwardMA[0] : null;
@@ -2663,8 +2684,14 @@
         const nearLimitUp = ordinaryStockLimitRuleEligible && Number.isFinite(dayChangePct) && dayChangePct >= 9.5;
         const nearLimitDown = ordinaryStockLimitRuleEligible && Number.isFinite(dayChangePct) && dayChangePct <= -9.5;
 
+        const hasOHLCV = Number.isFinite(Number(latest.open))
+            && Number.isFinite(Number(latest.high))
+            && Number.isFinite(Number(latest.low))
+            && Number.isFinite(Number(latest.volume));
+
         const volumeInfo = {
-            available: Number.isFinite(volRatio) && validVolumes.length >= 21,
+            available: hasOHLCV && Number.isFinite(volRatio) && validVolumes.length >= 21,
+            hasOHLCV,
             volToday, volMA5, volMA20, volMA60, volRatio,
             state: volumeState,
             bullishCandle, bearishCandle, smallBody, longLowerWick, longUpperWick,
@@ -2763,7 +2790,7 @@
 
         let bias = { key: 'neutral', label: '🟡 震盪 / 等待確認' };
         if (trendScore >= 3) bias = { key: 'bullish', label: '🟢 偏多 / 結構較強' };
-        else if (trendScore <= -2) bias = { key: 'bearish', label: '🟢 偏弱 / 風險較高' };
+        else if (trendScore <= -2) bias = { key: 'bearish', label: '🔴 偏弱 / 風險較高' };
 
         // ===== 3) 支撐候選 =====
         const rawSupports = [
@@ -3024,7 +3051,7 @@
             const q = parseFloat(row.querySelector('.qty-input')?.value) || 0;
             if (q > 0) rrQty += q;
         });
-        const rrQtySource = rrQty > 0 ? '目前輸入股數' : '100股模型部位';
+        const rrQtySource = rrQty > 0 ? '目前輸入股數' : '未輸入股數→100股零股模型';
         if (rrQty <= 0) rrQty = 100;
 
         const typeForTax = String(instrumentType || 'STOCK').toUpperCase();
@@ -3362,7 +3389,9 @@
             : '';
         const volSummary = data.volumeInfo?.available
             ? `${data.volumeInfo.state.label} VolRatio ${formatNumber(data.volumeInfo.volRatio, 2)}｜前5日均量 ${formatNumber(data.volumeInfo.volMA5, 0)} / 前20日均量 ${formatNumber(data.volumeInfo.volMA20, 0)} / 前60日均量 ${formatNumber(data.volumeInfo.volMA60, 0)}${specialVolTag}${liquidityTag}${newListingTag}`
-            : '量能資料不足';
+            : (data.volumeInfo?.hasOHLCV === false
+                ? '⚠️ OHLCV欄位缺失：量能/K棒確認已停用'
+                : '量能資料不足');
         const divergenceSummary = data.volumeInfo?.divergenceText ? `｜${data.volumeInfo.divergenceText}` : '';
         statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜${volSummary}${divergenceSummary}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜建議價已依台股跳動單位四捨五入`;
     }
