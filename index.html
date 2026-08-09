@@ -2553,9 +2553,11 @@
         };
 
         const volToday = Number(latest.volume);
-        const volMA5 = avgVolume(closes.slice(-5));
-        const volMA20 = avgVolume(closes.slice(-20));
-        const volMA60 = avgVolume(closes.slice(-60));
+        // IMPORTANT: historical average volume excludes today's bar to avoid self-reference.
+        const priorBars = closes.slice(0, -1);
+        const volMA5 = avgVolume(priorBars.slice(-5));
+        const volMA20 = avgVolume(priorBars.slice(-20));
+        const volMA60 = avgVolume(priorBars.slice(-60));
         const volRatio = (Number.isFinite(volToday) && Number.isFinite(volMA5) && volMA5 > 0)
             ? volToday / volMA5
             : null;
@@ -2571,6 +2573,10 @@
         const O = Number.isFinite(Number(latest.open)) ? Number(latest.open) : C;
         const H = Number.isFinite(Number(latest.high)) ? Number(latest.high) : C;
         const L = Number.isFinite(Number(latest.low)) ? Number(latest.low) : C;
+        const prevBar = closes.length >= 2 ? closes[closes.length - 2] : null;
+        const prevClose = Number(prevBar?.close);
+        const prevOpen = Number(prevBar?.open);
+
         const candleRange = Math.max(0, H - L);
         const candleBody = Math.abs(C - O);
         const lowerWick = Math.max(0, Math.min(O, C) - L);
@@ -2578,14 +2584,32 @@
         const bullishCandle = C > O;
         const bearishCandle = C < O;
         const smallBody = candleRange > 0 ? candleBody / candleRange <= 0.25 : true;
-        const longLowerWick = candleRange > 0 && lowerWick >= Math.max(candleBody * 1.5, candleRange * 0.35);
-        const longUpperWick = candleRange > 0 && upperWick >= Math.max(candleBody * 1.5, candleRange * 0.35);
+
+        // Executable candlestick definitions:
+        // Long lower wick = lower wick >= 2x body AND close in upper third of day's range.
+        // Long upper wick = upper wick >= 2x body AND close in lower third of day's range.
+        const closeInUpperThird = candleRange > 0 && C >= L + candleRange * (2/3);
+        const closeInLowerThird = candleRange > 0 && C <= L + candleRange * (1/3);
+        const longLowerWick = candleRange > 0 && lowerWick >= Math.max(candleBody * 2, candleRange * 0.20) && closeInUpperThird;
+        const longUpperWick = candleRange > 0 && upperWick >= Math.max(candleBody * 2, candleRange * 0.20) && closeInLowerThird;
+
+        // Bullish engulfing: today's real body fully engulfs yesterday's real body.
+        const bullishEngulfing = Number.isFinite(prevClose) && Number.isFinite(prevOpen)
+            && bullishCandle && prevClose < prevOpen
+            && O <= prevClose && C >= prevOpen;
+
+        // Taiwan limit-day special handling: use close-to-close move; 9.5% is treated as near-limit.
+        const dayChangePct = Number.isFinite(prevClose) && prevClose > 0 ? ((C - prevClose) / prevClose) * 100 : null;
+        const nearLimitUp = Number.isFinite(dayChangePct) && dayChangePct >= 9.5;
+        const nearLimitDown = Number.isFinite(dayChangePct) && dayChangePct <= -9.5;
 
         const volumeInfo = {
-            available: Number.isFinite(volRatio) && validVolumes.length >= 20,
+            available: Number.isFinite(volRatio) && validVolumes.length >= 21,
             volToday, volMA5, volMA20, volMA60, volRatio,
             state: volumeState,
-            bullishCandle, bearishCandle, smallBody, longLowerWick, longUpperWick,
+            bullishCandle, bearishCandle, smallBody, longLowerWick, longUpperWick, bullishEngulfing,
+            dayChangePct, nearLimitUp, nearLimitDown,
+            lowLiquidity: Number.isFinite(volMA20) && volMA20 < 500000,
             entryConfidence: 0,
             entryText: '',
             trendAdjustment: 0,
@@ -2597,17 +2621,17 @@
         // A5. 量價背離：使用前20日（不含今日）的高低，並要求至少 0.3% 或 1 個合法 tick 的突破幅度。
         if (volumeInfo.available && Number.isFinite(volMA20) && volMA20 > 0 && closes.length >= 21) {
             const prior20 = closes.slice(-21, -1);
-            const prior20High = Math.max(...prior20.map(x => Number(x.high ?? x.close)).filter(Number.isFinite));
-            const prior20Low = Math.min(...prior20.map(x => Number(x.low ?? x.close)).filter(Number.isFinite));
+            const prior20High = Math.max(...prior20.map(x => Number(x.close)).filter(Number.isFinite));
+            const prior20Low = Math.min(...prior20.map(x => Number(x.close)).filter(Number.isFinite));
             const highTolerance = Math.max(prior20High * 0.003, getTaiwanTickSize(prior20High, instrumentTypeForVolume));
             const lowTolerance = Math.max(prior20Low * 0.003, getTaiwanTickSize(prior20Low, instrumentTypeForVolume));
 
-            if (Number.isFinite(prior20High) && H >= prior20High + highTolerance && volMA5 < volMA20) {
+            if (Number.isFinite(prior20High) && C >= prior20High + highTolerance && volMA5 < volMA20) {
                 volumeInfo.trendAdjustment -= 1;
-                volumeInfo.divergenceText = '20日新高但5日均量低於20日均量：量價背離，頂部警訊';
-            } else if (Number.isFinite(prior20Low) && L <= prior20Low - lowTolerance && volMA5 < volMA20) {
+                volumeInfo.divergenceText = '收盤創20日新高但5日均量低於20日均量：量價背離，頂部警訊';
+            } else if (Number.isFinite(prior20Low) && C <= prior20Low - lowTolerance && volMA5 < volMA20) {
                 volumeInfo.trendAdjustment += 1;
-                volumeInfo.divergenceText = '20日新低但5日均量低於20日均量：賣壓衰竭訊號';
+                volumeInfo.divergenceText = '收盤創20日新低但5日均量低於20日均量：量能背離，賣壓衰竭訊號';
             }
         }
 
@@ -2937,26 +2961,49 @@
         const tp1Broken = C > profitHigh;
 
         if (volumeInfo.available && entryTouched) {
-            if (volRatio <= 0.6 && (bullishCandle || smallBody)) {
+            // Limit days override normal VolRatio interpretation.
+            if (nearLimitDown) {
+                volumeInfo.entryConfidence = -2;
+                volumeInfo.entryText = `跌幅 ${formatNumber(dayChangePct, 2)}% 接近跌停：忽略地量解讀，恐慌風險優先`;
+            } else if (nearLimitUp) {
+                volumeInfo.entryConfidence = 2;
+                volumeInfo.entryText = `漲幅 ${formatNumber(dayChangePct, 2)}% 接近漲停：強勢鎖價訊號，不以地量視為買氣不足`;
+            } else if (volRatio <= 0.6 && (bullishCandle || smallBody)) {
                 volumeInfo.entryConfidence = 1;
                 volumeInfo.entryText = '地量回測且止穩 / 小實體：賣壓枯竭，Entry 信心 +1';
             } else if (volRatio <= 0.6 && bearishCandle) {
                 volumeInfo.entryConfidence = 0;
                 volumeInfo.entryText = '地量續跌：賣壓已弱但尚未止跌，建議再觀察1日';
-            } else if (volRatio >= 1.5 && (longLowerWick || bullishCandle)) {
+            } else if (volRatio >= 1.5 && (longLowerWick || bullishEngulfing || bullishCandle)) {
                 volumeInfo.entryConfidence = 2;
-                volumeInfo.entryText = `${volumeState.label} + ${longLowerWick ? '長下影承接' : '收紅'}：買盤承接明確，Entry 信心 +2`;
+                const patternText = longLowerWick ? '長下影承接' : (bullishEngulfing ? '看漲吞噬' : '收紅');
+                volumeInfo.entryText = `${volumeState.label} + ${patternText}：買盤承接明確，Entry 信心 +2`;
             } else if (volRatio >= 1.5 && bearishCandle && C < entryLow) {
                 volumeInfo.entryConfidence = -2;
-                volumeInfo.entryText = `${volumeState.label} + 收黑跌破 Entry：拋售壓力高，Entry 信心 -2`;
+                volumeInfo.entryText = `${volumeState.label} + 收黑破底：收盤低於開盤且跌破 Entry 下緣，Entry 信心 -2`;
+            } else if (volRatio > 0.6 && volRatio < 1.5 && (bullishCandle || smallBody)) {
+                volumeInfo.entryConfidence = 0.5;
+                volumeInfo.entryText = '正常量 + 收紅 / 止穩：溫和確認，Entry 信心 +0.5';
+            } else if (volRatio > 0.6 && volRatio < 1.5 && bearishCandle) {
+                volumeInfo.entryConfidence = -0.5;
+                volumeInfo.entryText = '正常量 + 收黑：溫和轉弱，Entry 信心 -0.5';
             } else {
                 volumeInfo.entryText = `${volumeState.label}：量能未形成明確 Entry 加減分`;
+            }
+
+            // Low-liquidity stocks: volume-derived positive confidence is disabled;
+            // negative warnings remain active for risk control.
+            if (volumeInfo.lowLiquidity) {
+                if (volumeInfo.entryConfidence > 0) volumeInfo.entryConfidence = 0;
+                volumeInfo.entryText += '｜⚠️ 20日均量低於500張，低流動性，量能加分停用';
             }
         }
 
         // A3. 真 / 假跌破確認
         if (volumeInfo.available && supportBroken) {
-            if (volRatio >= 1.3) {
+            if (nearLimitDown) {
+                volumeInfo.breakdownText = `🔴 接近跌停：跌幅 ${formatNumber(dayChangePct, 2)}%，不以地量視為假跌破，Stop Loss 風控優先`;
+            } else if (volRatio >= 1.3) {
                 volumeInfo.breakdownText = `✅ 確認跌破：收盤跌破防守群聚且 VolRatio ${formatNumber(volRatio, 2)} ≥ 1.30`;
             } else {
                 volumeInfo.breakdownText = `⚠️ 疑似假跌破：收盤跌破但 VolRatio ${formatNumber(volRatio, 2)} < 1.30，轉 DEFENSIVE 並觀察1日`;
@@ -2998,7 +3045,13 @@
 
         // Volume 是最後的訊號確認層：可升級 / 降級 ACTION，但不改寫 Entry / TP 的價格位置。
         if (volumeInfo.available) {
-            if (supportBroken && volRatio >= 1.3) {
+            if (nearLimitDown && supportBroken) {
+                action = {
+                    cls: 'bearish',
+                    title: '🔴 LIMIT-DOWN RISK // 跌停風控優先',
+                    reason: `跌幅 ${formatNumber(dayChangePct, 2)}% 接近跌停且已破壞防守結構；忽略常規地量判讀，Stop Loss 優先。`
+                };
+            } else if (supportBroken && volRatio >= 1.3) {
                 action = {
                     cls: 'bearish',
                     title: '🔴 CONFIRMED BREAKDOWN // 放量跌破',
@@ -3161,8 +3214,12 @@
         actionEl.textContent = data.action.title;
         actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
         actionReason.textContent = data.action.reason;
+        const specialVolTag = data.volumeInfo?.nearLimitUp
+            ? '｜🔴 接近漲停'
+            : (data.volumeInfo?.nearLimitDown ? '｜🔴 接近跌停' : '');
+        const liquidityTag = data.volumeInfo?.lowLiquidity ? '｜⚠️ 低流動性(<500張/20日均量)' : '';
         const volSummary = data.volumeInfo?.available
-            ? `${data.volumeInfo.state.label} VolRatio ${formatNumber(data.volumeInfo.volRatio, 2)}｜VOL5 ${formatNumber(data.volumeInfo.volMA5, 0)} / VOL20 ${formatNumber(data.volumeInfo.volMA20, 0)} / VOL60 ${formatNumber(data.volumeInfo.volMA60, 0)}`
+            ? `${data.volumeInfo.state.label} VolRatio ${formatNumber(data.volumeInfo.volRatio, 2)}｜前5日均量 ${formatNumber(data.volumeInfo.volMA5, 0)} / 前20日均量 ${formatNumber(data.volumeInfo.volMA20, 0)} / 前60日均量 ${formatNumber(data.volumeInfo.volMA60, 0)}${specialVolTag}${liquidityTag}`
             : '量能資料不足';
         const divergenceSummary = data.volumeInfo?.divergenceText ? `｜${data.volumeInfo.divergenceText}` : '';
         statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜${volSummary}${divergenceSummary}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜建議價已依台股跳動單位四捨五入`;
