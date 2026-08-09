@@ -399,6 +399,11 @@
             letter-spacing: .15px;
         }
 
+        .stock-search-hint::before {
+            content: "⌨ ";
+            color: var(--accent-amber);
+        }
+
         @media (max-width: 680px) {
             .stock-search-item {
                 grid-template-columns: 72px minmax(0, 1fr);
@@ -1782,15 +1787,13 @@
                 <div class="portfolio-search-wrap">
                     <input type="text" id="portfolioName" value="" autocomplete="off"
                            placeholder="輸入股票代號或名稱（例如 2330、台積電、元大）"
-                           oninput="handlePortfolioSearchInput(event)"
-                           oncompositionstart="handlePortfolioCompositionStart()"
-                           oncompositionend="handlePortfolioCompositionEnd()"
+                           oninput="handlePortfolioSearchInput()"
                            onkeydown="handlePortfolioSearchKeydown(event)">
                     <div id="stockSearchDropdown" class="stock-search-dropdown" role="listbox" aria-label="股票搜尋結果"></div>
                 </div>
                 <button type="button" class="btn-refresh-all" id="refreshAllDataBtn" onclick="refreshAllData()">⚡ 更新所有數據</button>
             </div>
-            <div class="stock-search-hint">可輸入代號或部分名稱搜尋，例如「2330」、「台積」、「元大」</div>
+            <div class="stock-search-hint">輸入代號或部分名稱後按 Tab 搜尋，例如「2330」、「台積」、「元大」</div>
             <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
     </div>
@@ -4718,74 +4721,41 @@
         refreshAllData();
     }
 
-    /* 🔎 即時模糊搜尋：使用者停止輸入約 250ms 後自動展開。
-       composition guard 可避免 iPhone / iPad / 中文輸入法組字過程誤觸。 */
-    let portfolioSearchTimer = null;
-    let portfolioSearchComposing = false;
-
-    function schedulePortfolioLiveSearch(delay = 250) {
-        const input = document.getElementById('portfolioName');
-        const dropdown = document.getElementById('stockSearchDropdown');
-        if (!input || portfolioSearchComposing) return;
-
-        clearTimeout(portfolioSearchTimer);
-
-        const query = input.value.trim();
-        if (!query) {
-            closeStockSearchDropdown();
-            return;
-        }
-
-        // 有輸入時不必失焦；停頓後直接在目前焦點下方展開。
-        portfolioSearchTimer = setTimeout(() => {
-            if (portfolioSearchComposing) return;
-            const current = input.value.trim();
-            if (!current) {
-                closeStockSearchDropdown();
-                return;
-            }
-            renderStockSearchDropdown(current);
-        }, delay);
-    }
-
-    function handlePortfolioSearchInput(event) {
+    /* 🔎 Tab 觸發模糊搜尋
+       使用者輸入代號或名稱後，按 Tab 才展開搜尋結果。
+       不再使用停頓 debounce，避免桌機 / iPad / iPhone 行為差異。 */
+    function handlePortfolioSearchInput() {
         const input = document.getElementById('portfolioName');
         if (!input) return;
 
-        // 既有顯示/計算同步照常保留。
+        // 保留既有畫面同步，但輸入時不主動展開搜尋結果。
         updatePortfolioDisplay();
 
-        // 中文輸入法正在組字時先不搜尋，組字完成後由 compositionend 觸發。
-        if (portfolioSearchComposing || (event && event.isComposing)) return;
-
-        schedulePortfolioLiveSearch(250);
-
-        // 保留完整代號自動補名稱，但稍微晚於模糊搜尋。
-        clearTimeout(stockNameFillTimer);
-        stockNameFillTimer = setTimeout(autoFillStockName, 500);
-    }
-
-    function handlePortfolioCompositionStart() {
-        portfolioSearchComposing = true;
-        clearTimeout(portfolioSearchTimer);
-    }
-
-    function handlePortfolioCompositionEnd() {
-        portfolioSearchComposing = false;
-
-        const input = document.getElementById('portfolioName');
-        if (!input) return;
-
-        updatePortfolioDisplay();
-        schedulePortfolioLiveSearch(120);
-
+        // 完整股票代號自動補名稱仍保留。
         clearTimeout(stockNameFillTimer);
         stockNameFillTimer = setTimeout(autoFillStockName, 500);
     }
 
     function handlePortfolioSearchKeydown(event) {
+        const input = document.getElementById('portfolioName');
         const dropdown = document.getElementById('stockSearchDropdown');
         const isOpen = dropdown && dropdown.classList.contains('show');
+
+        if (event.key === 'Tab') {
+            const query = input ? input.value.trim() : '';
+
+            if (query) {
+                // 第一次 Tab：開啟模糊搜尋並保留焦點在輸入框。
+                event.preventDefault();
+                renderStockSearchDropdown(query);
+
+                if (stockSearchResults.length) {
+                    stockSearchActiveIndex = 0;
+                    updateStockSearchActiveItem();
+                }
+            }
+            return;
+        }
 
         if (event.key === 'ArrowDown' && isOpen && stockSearchResults.length) {
             event.preventDefault();
@@ -4854,12 +4824,7 @@
         const input = document.getElementById('portfolioName');
         if (!input) return;
 
-        input.addEventListener('focus', () => {
-            if (input.value.trim()) schedulePortfolioLiveSearch(80);
-        });
-
         input.addEventListener('blur', () => {
-            clearTimeout(portfolioSearchTimer);
             updatePortfolioStockMeta(input.value);
             clearTimeout(stockNameFillTimer);
             autoFillStockName();
