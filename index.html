@@ -723,7 +723,7 @@
         /* 🇹🇼 MARKET PULSE // 台股大盤 */
         .market-pulse-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
             margin-top: 10px;
         }
@@ -1922,11 +1922,6 @@
                     <div class="sub neutral" id="mpBasisLabel">等待資料</div>
                 </div>
 
-                <div class="market-pulse-item">
-                    <label>TX CONTRACT // 近月契約</label>
-                    <div class="value neutral" id="mpTxContract">--</div>
-                    <div class="sub neutral" id="mpMarketDate">--</div>
-                </div>
             </div>
 
             <div class="market-pulse-source" id="mpSourceText">
@@ -2708,8 +2703,8 @@
 
 
     /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE
-       v4.8.2：只顯示最新 TAIEX / TX / BASIS / 近月契約。
-       不再計算 MA5/10/20/60 與 MARKET TREND。 */
+       v4.8.3：只顯示 TAIEX / TX FRONT / BASIS。
+       TAIEX 使用最近兩個交易日計算漲跌，與 TX FRONT 採相同紅漲綠跌呈現。 */
     function mpNumber(value) {
         const n = Number(value);
         return Number.isFinite(n) ? n : null;
@@ -2734,21 +2729,33 @@
         const sourceText = document.getElementById('mpSourceText');
 
         if (typeof MARKET_DATA === 'undefined') {
-            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6-simple.py';
+            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6.3.py';
             if (sourceText) sourceText.textContent = 'DATA SOURCE // market-data.js 尚未載入';
             return;
         }
 
         try {
-            const latest = MARKET_DATA?.taiex?.latest || MARKET_DATA?.taiex?.history?.at(-1) || null;
+            const history = Array.isArray(MARKET_DATA?.taiex?.history)
+                ? MARKET_DATA.taiex.history
+                    .map(x => ({ date: String(x.date || ''), close: mpNumber(x.close) }))
+                    .filter(x => x.date && Number.isFinite(x.close))
+                : [];
+
+            const latest = history.at(-1) || MARKET_DATA?.taiex?.latest || null;
+            const prev = history.length >= 2 ? history.at(-2) : null;
             const tx = MARKET_DATA?.tx || null;
 
             const taiexValueEl = document.getElementById('mpTaiexValue');
             const taiexChangeEl = document.getElementById('mpTaiexChange');
-
             const taiexClose = mpNumber(latest?.close);
-            const taiexChange = mpNumber(latest?.change);
-            const taiexChangePct = mpNumber(latest?.changePct);
+
+            let taiexChange = mpNumber(latest?.change);
+            let taiexChangePct = mpNumber(latest?.changePct);
+
+            if (!Number.isFinite(taiexChange) && prev && Number.isFinite(taiexClose)) {
+                taiexChange = taiexClose - prev.close;
+                taiexChangePct = prev.close ? (taiexChange / prev.close) * 100 : null;
+            }
 
             if (Number.isFinite(taiexClose)) {
                 taiexValueEl.textContent = mpFormat(taiexClose, 2);
@@ -2778,12 +2785,10 @@
                     ? `${txChange >= 0 ? '+' : ''}${mpFormat(txChange, 0)}${Number.isFinite(txChangePct) ? ` (${txChangePct >= 0 ? '+' : ''}${mpFormat(txChangePct, 2)}%)` : ''}`
                     : `資料日 ${tx?.date || '--'}`;
                 mpSetDirection(txValueEl, txChangeEl, txChange || 0);
-                document.getElementById('mpTxContract').textContent = tx?.contractMonth || 'TX';
             } else {
                 txValueEl.textContent = '--';
                 txChangeEl.textContent = 'TAIFEX 無資料';
                 mpSetDirection(txValueEl, txChangeEl, 0);
-                document.getElementById('mpTxContract').textContent = '--';
             }
 
             const basis = Number.isFinite(taiexClose) && Number.isFinite(txClose)
@@ -2819,11 +2824,6 @@
                 basisLabel.className = 'sub neutral';
             }
 
-            const dateBits = [];
-            if (latest?.date) dateBits.push(`TAIEX ${latest.date}`);
-            if (tx?.date) dateBits.push(`TX ${tx.date}`);
-            document.getElementById('mpMarketDate').textContent = dateBits.join('｜') || '--';
-
             const generated = (typeof MARKET_DATABASE_META !== 'undefined' && MARKET_DATABASE_META.generatedAt)
                 ? `｜DB ${MARKET_DATABASE_META.generatedAt}`
                 : '';
@@ -2835,7 +2835,7 @@
 
             if (sourceText) {
                 sourceText.textContent =
-                    'DATA SOURCE // market-data.js｜TWSE TAIEX + TAIFEX TX｜Python Builder v3.6-simple';
+                    'DATA SOURCE // market-data.js｜TWSE TAIEX + TAIFEX TX｜Python Builder v3.6.3';
             }
         } catch (error) {
             console.error('Static Market Pulse error:', error);
