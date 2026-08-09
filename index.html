@@ -1671,48 +1671,53 @@
     </div>
 
     <!-- 💰 基本面：本益比 / 殖利率 / 股價淨值比 -->
-    <div class="news-card">
+    <div class="news-card" id="fundamentalsCard">
         <div class="news-header-title">
             <h3>💰 FUNDAMENTALS // <span id="fundStockTitle">聯發科 (2454)</span> 基本面數據</h3>
-            <button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="refreshFundamentals()">🔄 重新整理</button>
-        </div>
-        <div id="fundStatusText" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">尚未計算</div>
-        <div class="info-grid">
-            <div class="info-item">
-                <label>本益比 // P/E</label>
-                <div class="value" id="fundPER">--</div>
-            </div>
-            <div class="info-item">
-                <label>股價淨值比 // P/B</label>
-                <div class="value" id="fundPBR">--</div>
-            </div>
-            <div class="info-item">
-                <label>殖利率 // YIELD</label>
-                <div class="value" id="fundYield">--</div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn btn-secondary" style="font-size: 0.7rem; padding: 2px 6px;" onclick="refreshFundamentals()">🔄 重新整理</button>
+                <button class="btn-collapse-toggle" id="fundamentalsCollapseBtn" onclick="toggleCardCollapse('fundamentalsCard','fundamentalsCollapseBtn')">▲ 收合</button>
             </div>
         </div>
+        <div class="card-body">
+            <div id="fundStatusText" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">尚未計算</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>本益比 // P/E</label>
+                    <div class="value" id="fundPER">--</div>
+                </div>
+                <div class="info-item">
+                    <label>股價淨值比 // P/B</label>
+                    <div class="value" id="fundPBR">--</div>
+                </div>
+                <div class="info-item">
+                    <label>殖利率 // YIELD</label>
+                    <div class="value" id="fundYield">--</div>
+                </div>
+            </div>
 
-        <div style="margin-top:14px; border-top:1px solid #1a2234; padding-top:10px;">
-            <div style="font-size:0.74rem; color:var(--accent-cyan); font-weight:800; letter-spacing:0.5px; margin-bottom:7px;">
-                💵 3-YEAR DIVIDEND / EX-RIGHTS // 近3年除權息與發放資訊
-            </div>
-            <div id="dividendStatusText" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:7px;">尚未載入</div>
-            <div style="overflow-x:auto; border:1px solid var(--card-border); border-radius:4px;">
-                <table class="returns-table" style="margin-top:0; min-width:760px;">
-                    <thead>
-                        <tr>
-                            <th>年度</th>
-                            <th>除權息日</th>
-                            <th>現金股利</th>
-                            <th>現金發放日</th>
-                            <th>股票股利</th>
-                            <th>股票發放日</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dividendHistoryBody">
-                        <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">--</td></tr>
-                    </tbody>
-                </table>
+            <div style="margin-top:14px; border-top:1px solid #1a2234; padding-top:10px;">
+                <div style="font-size:0.74rem; color:var(--accent-cyan); font-weight:800; letter-spacing:0.5px; margin-bottom:7px;">
+                    💵 3-YEAR DIVIDEND / EX-RIGHTS // 近3年除權息與發放資訊
+                </div>
+                <div id="dividendStatusText" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:7px;">尚未載入</div>
+                <div style="overflow-x:auto; border:1px solid var(--card-border); border-radius:4px;">
+                    <table class="returns-table" style="margin-top:0; min-width:760px;">
+                        <thead>
+                            <tr>
+                                <th>年度</th>
+                                <th>除權息日</th>
+                                <th>現金股利</th>
+                                <th>現金發放日</th>
+                                <th>股票股利</th>
+                                <th>股票發放日</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dividendHistoryBody">
+                            <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">--</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
