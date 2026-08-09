@@ -524,6 +524,58 @@
         .latest-price-change.below { color: var(--loss-color); }
         .latest-price-change.neutral { color: var(--text-muted); }
 
+        /* 漲跌停專屬行情 Banner：只改最新價格列，不影響 MA 卡片 */
+        .latest-price-box.limit-up,
+        .latest-price-box.limit-down {
+            position: relative;
+            align-items: center;
+            padding: 12px 14px;
+            overflow: hidden;
+        }
+        .latest-price-box.limit-up {
+            background: linear-gradient(135deg, #8b1010 0%, #d51f1f 58%, #a41414 100%);
+            border-color: #ff5a5a;
+            box-shadow: 0 0 16px rgba(255, 45, 45, 0.30), inset 0 0 18px rgba(255,255,255,0.04);
+        }
+        .latest-price-box.limit-down {
+            background: linear-gradient(135deg, #075f3a 0%, #0b9b5c 58%, #087345 100%);
+            border-color: #2dd886;
+            box-shadow: 0 0 16px rgba(35, 210, 125, 0.24), inset 0 0 18px rgba(255,255,255,0.04);
+        }
+        .latest-price-box.limit-up .latest-price-value,
+        .latest-price-box.limit-up .latest-price-change,
+        .latest-price-box.limit-down .latest-price-value,
+        .latest-price-box.limit-down .latest-price-change {
+            color: #fff !important;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.32);
+        }
+        .latest-price-box.limit-up .latest-price-value,
+        .latest-price-box.limit-down .latest-price-value {
+            font-size: 1.65rem;
+        }
+        .limit-status-badge {
+            margin-left: auto;
+            padding: 5px 9px;
+            border: 1px solid rgba(255,255,255,0.62);
+            border-radius: 999px;
+            color: #fff;
+            background: rgba(0,0,0,0.18);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            white-space: nowrap;
+        }
+        .limit-status-badge.hidden { display: none; }
+
+        @media (max-width: 700px) {
+            .limit-status-badge {
+                width: 100%;
+                margin-left: 0;
+                text-align: center;
+            }
+        }
+
         .ma-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -1554,6 +1606,7 @@
         <div class="latest-price-box" id="maLatestPriceBox">
             <span class="latest-price-value neutral" id="maLatestPriceValue">--</span>
             <span class="latest-price-change neutral" id="maLatestPriceChange"></span>
+            <span class="limit-status-badge hidden" id="maLimitStatusBadge"></span>
         </div>
         <div class="ma-grid">
             <div class="ma-item">
@@ -2322,11 +2375,54 @@
         return null;
     }
 
-    /* 📊 顯示最新收盤價，並比對前一交易日收盤計算漲跌與漲跌幅 (紅=上漲／綠=下跌) */
+    /* 台股漲跌停 UI 使用「制度價格」判斷：
+       上限價向下取合法檔位、下限價向上取合法檔位，避免把 +9.5% 技術容忍值誤標為真正漲跌停。 */
+    function getTaiwanDailyLimitPrice(referencePrice, direction = 'up', instrumentType = 'STOCK') {
+        const ref = Number(referencePrice);
+        if (!Number.isFinite(ref) || ref <= 0) return null;
+
+        let raw = ref * (direction === 'down' ? 0.90 : 1.10);
+        let value = raw;
+
+        for (let i = 0; i < 4; i++) {
+            const tick = getTaiwanTickSize(value, instrumentType);
+            const units = raw / tick;
+            const roundedUnits = direction === 'down'
+                ? Math.ceil(units - Number.EPSILON)
+                : Math.floor(units + Number.EPSILON);
+            const decimals = tick < 0.1 ? 2 : tick < 1 ? 1 : 0;
+            const next = Number((roundedUnits * tick).toFixed(decimals));
+            if (Math.abs(next - value) < 1e-9) return next;
+            value = next;
+        }
+        return value;
+    }
+
+    function formatTaiwanMarketPrice(price, instrumentType = 'STOCK') {
+        const p = Number(price);
+        if (!Number.isFinite(p)) return '--';
+        const tick = getTaiwanTickSize(p, instrumentType);
+        const decimals = tick < 0.1 ? 2 : tick < 1 ? 1 : 0;
+        return formatNumber(p, decimals);
+    }
+
+    /* 📊 顯示最新收盤價，並比對前一交易日收盤計算漲跌與漲跌幅。
+       真正漲停=紅底白字；真正跌停=綠底白字；一般行情維持原本紅/綠數字。 */
     function renderLatestPrice(data) {
         const valueEl = document.getElementById('maLatestPriceValue');
         const changeEl = document.getElementById('maLatestPriceChange');
+        const boxEl = document.getElementById('maLatestPriceBox');
+        const badgeEl = document.getElementById('maLimitStatusBadge');
         if (!valueEl || !changeEl) return;
+
+        const resetLimitUI = () => {
+            if (boxEl) boxEl.classList.remove('limit-up', 'limit-down');
+            if (badgeEl) {
+                badgeEl.textContent = '';
+                badgeEl.className = 'limit-status-badge hidden';
+            }
+        };
+        resetLimitUI();
 
         if (!data || !data.latest) {
             valueEl.textContent = '--';
@@ -2337,9 +2433,11 @@
         }
 
         const { latest, prevClose } = data;
+        const stockNo = extractStockCode(document.getElementById('portfolioName')?.value || '');
+        const instrumentType = getStockTypeForUI(stockNo);
 
         if (!prevClose) {
-            valueEl.textContent = `$${formatNumber(latest.close, 2)}`;
+            valueEl.textContent = `$${formatTaiwanMarketPrice(latest.close, instrumentType)}`;
             valueEl.className = 'latest-price-value neutral';
             changeEl.textContent = `（${latest.dateStr} 收盤，無前一交易日資料可比對）`;
             changeEl.className = 'latest-price-change neutral';
@@ -2348,6 +2446,15 @@
 
         const change = latest.close - prevClose.close;
         const changePct = (change / prevClose.close) * 100;
+        const limitUpPrice = getTaiwanDailyLimitPrice(prevClose.close, 'up', instrumentType);
+        const limitDownPrice = getTaiwanDailyLimitPrice(prevClose.close, 'down', instrumentType);
+        const tick = getTaiwanTickSize(latest.close, instrumentType);
+        const tolerance = Math.max(1e-9, tick / 1000);
+
+        // UI 僅在「收盤價真的等於制度漲跌停價」時啟動特殊底色。
+        // Volume Engine 原本 ±9.5% 的技術分析容忍值維持獨立，不與 UI 混用。
+        const isLimitUp = Number.isFinite(limitUpPrice) && Math.abs(latest.close - limitUpPrice) <= tolerance;
+        const isLimitDown = Number.isFinite(limitDownPrice) && Math.abs(latest.close - limitDownPrice) <= tolerance;
 
         let cls = 'neutral';
         let arrow = '▬';
@@ -2355,12 +2462,21 @@
         else if (change < 0) { cls = 'below'; arrow = '▼'; }
 
         const sign = change > 0 ? '+' : '';
-
-        valueEl.textContent = `$${formatNumber(latest.close, 2)}`;
+        valueEl.textContent = `$${formatTaiwanMarketPrice(latest.close, instrumentType)}`;
         valueEl.className = `latest-price-value ${cls}`;
 
         changeEl.textContent = `${arrow} ${sign}${formatNumber(change, 2)} (${sign}${formatNumber(changePct, 2)}%)｜${latest.dateStr} 較前日 ${prevClose.dateStr}`;
         changeEl.className = `latest-price-change ${cls}`;
+
+        if (isLimitUp && boxEl && badgeEl) {
+            boxEl.classList.add('limit-up');
+            badgeEl.textContent = '🔒 LIMIT UP // 漲停';
+            badgeEl.className = 'limit-status-badge';
+        } else if (isLimitDown && boxEl && badgeEl) {
+            boxEl.classList.add('limit-down');
+            badgeEl.textContent = '🔒 LIMIT DOWN // 跌停';
+            badgeEl.className = 'limit-status-badge';
+        }
     }
 
     function renderCrossAlert(crossInfo) {
