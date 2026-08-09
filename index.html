@@ -22,7 +22,11 @@
     <script src="stock-list.js"></script>
     <script src="fundamentals-data.js"></script>
     <script src="dividend-data.js"></script>
-    <script src="market-data.js"></script>
+    <script>
+        // MARKET PULSE 靜態資料庫：每次重新載入頁面都帶 cache-buster，
+        // 避免不同裝置偶爾讀到舊版 market-data.js。
+        document.write('<script src="market-data.js?v=' + Date.now() + '"><\\/script>');
+    </script>
     <style>
         :root {
             --bg-color: #0b0e14;
@@ -2786,7 +2790,7 @@
 
 
     /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE
-       v4.8.2：只顯示最新 TAIEX / TX / BASIS / 近月契約。
+       v4.8.7：TAIEX 固定採靜態資料庫最後兩個有效交易日比較；週末 / 連假不影響。
        不再計算 MA5/10/20/60 與 MARKET TREND。 */
     function mpNumber(value) {
         const n = Number(value);
@@ -2818,14 +2822,50 @@
         }
 
         try {
-            const taiexHistory = Array.isArray(MARKET_DATA?.taiex?.history)
-                ? MARKET_DATA.taiex.history
-                    .map(x => ({ date: String(x?.date || ''), close: mpNumber(x?.close) }))
-                    .filter(x => x.date && Number.isFinite(x.close))
-                : [];
+            // v4.8.7：完全不看「今天 / 昨天」是不是交易日。
+            // 只從靜態 DB 中找出最後兩個「有效交易日」：
+            // 1) history + latest 一起納入
+            // 2) 日期正規化
+            // 3) 同日期去重
+            // 4) 依日期排序
+            // 5) 最後兩筆 = Previous / Latest
+            const normalizeMarketDateKey = (raw) => {
+                const s = String(raw || '').trim();
+                const m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+                if (!m) return null;
+                const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+                if (!(y >= 2000 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return null;
+                return `${String(y).padStart(4,'0')}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            };
 
-            const latest = taiexHistory.at(-1) || MARKET_DATA?.taiex?.latest || null;
-            const previous = taiexHistory.length >= 2 ? taiexHistory.at(-2) : null;
+            const rawTaiexRows = [];
+            if (Array.isArray(MARKET_DATA?.taiex?.history)) {
+                rawTaiexRows.push(...MARKET_DATA.taiex.history);
+            }
+            if (MARKET_DATA?.taiex?.latest) {
+                rawTaiexRows.push(MARKET_DATA.taiex.latest);
+            }
+
+            const taiexByDate = new Map();
+            rawTaiexRows.forEach(row => {
+                const dateKey = normalizeMarketDateKey(row?.date);
+                const close = mpNumber(row?.close);
+                if (!dateKey || !Number.isFinite(close)) return;
+
+                // 同日期若重複，以最後載入且數值有效者為準。
+                taiexByDate.set(dateKey, {
+                    ...row,
+                    date: dateKey.replaceAll('-', '/'),
+                    dateKey,
+                    close
+                });
+            });
+
+            const taiexHistory = Array.from(taiexByDate.values())
+                .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+            const latest = taiexHistory.length ? taiexHistory[taiexHistory.length - 1] : null;
+            const previous = taiexHistory.length >= 2 ? taiexHistory[taiexHistory.length - 2] : null;
             const tx = MARKET_DATA?.tx || null;
 
             const taiexValueEl = document.getElementById('mpTaiexValue');
@@ -2852,7 +2892,7 @@
                         `${taiexChange >= 0 ? '+' : ''}${mpFormat(taiexChange, 2)}${Number.isFinite(taiexChangePct) ? ` (${taiexChangePct >= 0 ? '+' : ''}${mpFormat(taiexChangePct, 2)}%)` : ''}`;
                     mpSetDirection(taiexValueEl, taiexChangeEl, taiexChange);
                 } else {
-                    taiexChangeEl.textContent = `需最近 2 個交易日資料`;
+                    taiexChangeEl.textContent = `靜態 DB 僅有 ${taiexHistory.length} 個有效交易日`;
                     mpSetDirection(taiexValueEl, taiexChangeEl, 0);
                 }
             } else {
@@ -2917,8 +2957,11 @@
                 : '';
 
             if (status) {
+                const taiexPairText = previous && latest
+                    ? `TAIEX ${previous.date} → ${latest.date}`
+                    : `TAIEX ${latest?.date || '--'}`;
                 status.textContent =
-                    `✅ STATIC MARKET DB｜TAIEX ${latest?.date || '--'}｜TX ${tx?.date || '--'} ${tx?.contractMonth || ''}${generated}`;
+                    `✅ STATIC MARKET DB｜${taiexPairText}｜TX ${tx?.date || '--'} ${tx?.contractMonth || ''}${generated}`;
             }
 
             if (sourceText) {
