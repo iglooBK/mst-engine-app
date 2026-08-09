@@ -257,11 +257,11 @@
             box-shadow: inset 0 0 14px rgba(245,158,11,.10), 0 0 18px rgba(245,158,11,.28);
         }
 
-        /* 控制區塊 */
+        /* 控制區塊：桌面固定三欄，讓 MKT PRICE / COMMISSION / MIN FEE 永遠等寬對齊 */
         .config-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px 14px;
             background: #090c10;
             border: 1px solid var(--card-border);
             border-radius: 4px;
@@ -273,6 +273,7 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
+            min-width: 0;
         }
 
         .config-item.full-width {
@@ -280,20 +281,27 @@
         }
 
         .config-item label {
+            display: block;
+            margin: 0;
             font-size: 0.75rem;
+            line-height: 1.35;
             font-weight: 700;
             color: var(--accent-cyan);
             letter-spacing: 0.5px;
             text-transform: uppercase;
+            white-space: nowrap;
         }
 
         .config-item input, .config-item select {
+            width: 100%;
+            height: 40px;
             padding: 8px 10px;
             border: 1px solid #2a364f;
             border-radius: 4px;
             font-size: 0.95rem;
+            line-height: 1.2;
             font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', 'Noto Sans TC', monospace;
             outline: none;
             background-color: var(--input-bg);
             color: #ffffff;
@@ -305,18 +313,22 @@
             box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
         }
 
-        /* ⚡ 股票代號主刷新鍵：輸入新標的後，一鍵同步所有下方資料卡 */
-        .portfolio-action-row {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 2px;
+        /* ⚡ 股票代號主刷新鍵：與股票名稱輸入框同列，避免撐高整個控制卡片 */
+        .portfolio-input-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .portfolio-input-row #portfolioName {
+            min-width: 0;
         }
 
         .btn-refresh-all {
-            min-width: 168px;
-            padding: 8px 14px;
+            min-width: 190px;
+            height: 40px;
+            padding: 8px 16px;
             border: 1px solid rgba(245, 158, 11, 0.75);
             border-radius: 4px;
             background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(6,182,212,0.10));
@@ -346,12 +358,22 @@
             opacity: 0.78;
         }
 
-        @media (max-width: 680px) {
-            .portfolio-action-row {
-                justify-content: stretch;
+        @media (max-width: 760px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+            .config-item.full-width {
+                grid-column: 1;
+            }
+            .config-item label {
+                white-space: normal;
+            }
+            .portfolio-input-row {
+                grid-template-columns: 1fr;
             }
             .btn-refresh-all {
                 width: 100%;
+                min-width: 0;
             }
         }
 
@@ -1272,13 +1294,17 @@
         }
     
         .stock-meta-line {
-            min-height: 18px;
-            margin-top: 6px;
+            min-height: 0;
+            margin-top: 0;
             padding-left: 2px;
             color: var(--accent-cyan);
             font-size: 0.72rem;
             font-weight: 700;
             letter-spacing: 0.3px;
+        }
+        .stock-meta-line:not(:empty) {
+            margin-top: 4px;
+            min-height: 18px;
         }
         .stock-meta-line .meta-market, .stock-meta-line .meta-type {
             display: inline-block;
@@ -1605,11 +1631,11 @@
     <div class="config-grid">
         <div class="config-item full-width">
             <label for="portfolioName">[PORTFOLIO NAME // 股票/組合名稱]</label>
-            <input type="text" id="portfolioName" value="台積電 (2330)" placeholder="輸入代碼會自動帶入名稱（例如 2330 → 2330 台積電）" oninput="updatePortfolioDisplay()" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); refreshAllData(); }">
-            <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
-            <div class="portfolio-action-row">
+            <div class="portfolio-input-row">
+                <input type="text" id="portfolioName" value="" placeholder="輸入代碼會自動帶入名稱（例如 2330 → 2330 台積電）" oninput="updatePortfolioDisplay()" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); refreshAllData(); }">
                 <button type="button" class="btn-refresh-all" id="refreshAllDataBtn" onclick="refreshAllData()">⚡ 更新所有數據</button>
             </div>
+            <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
         <div class="config-item">
             <label for="marketPrice">[MKT PRICE // 股票/指數現價]</label>
