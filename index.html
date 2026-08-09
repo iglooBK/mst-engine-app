@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <meta name="application-name" content="MST ENGINE PLOUTOS">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
-    <title>PRECISION EQUITY COST ENGINE | TWSE ODD-LOT TERMINAL</title>
+    <title>MST ENGINE PLOUTOS</title>
 
     <!-- 📱 PWA / iPhone「加入主畫面」設定 -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b0e14">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="股票成本計算">
+    <meta name="apple-mobile-web-app-title" content="MST ENGINE PLOUTOS">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 
@@ -1111,16 +1112,15 @@
             line-height: 1.45;
         }
         .ploutos-guide-bottom {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
+            display: contents;
         }
         .ploutos-rr, .ploutos-action {
             background: #090c10;
             border: 1px solid var(--card-border);
             border-radius: 4px;
-            padding: 10px 12px;
+            padding: 11px 10px;
+            min-height: 105px;
+            height: 100%;
         }
         .ploutos-rr .rr-value {
             color: #fff;
@@ -1145,7 +1145,6 @@
         }
         @media (max-width: 680px) {
             .ploutos-guide-grid { grid-template-columns: 1fr; }
-            .ploutos-guide-bottom { grid-template-columns: 1fr; }
             .ploutos-guide-title { align-items: flex-start; flex-direction: column; }
         }
     
@@ -1433,8 +1432,6 @@
                         <div class="guide-price" id="ploutosStop">--</div>
                         <div class="guide-note" id="ploutosStopNote">--</div>
                     </div>
-                </div>
-                <div class="ploutos-guide-bottom">
                     <div class="ploutos-rr">
                         <div style="font-size:0.66rem; color:var(--text-label); font-weight:800; margin-bottom:5px;">RISK / REWARD // 風險報酬比</div>
                         <div class="rr-value" id="ploutosRR">--</div>
@@ -1964,7 +1961,7 @@
             renderSupportResistance(sr);
 
             // PLOUTOS 新手決策引擎：直接整合 MA / 交叉訊號 / 支撐壓力，不新增 API
-            renderPloutosGuide(computePloutosGuide(closes, sr));
+            renderPloutosGuide(computePloutosGuide(closes, sr, stockNo));
         } catch (error) {
             console.error('Moving average error:', error);
             statusEl.textContent = `❌ 均線資料擷取失敗，可能是網路問題，或 ${getStockMarketDisplay(stockNo)} 暫時無法連線，請稍後重試。`;
@@ -2168,7 +2165,55 @@
     /* 🧭 PLOUTOS ENTRY / EXIT ENGINE
        將既有 MA、交叉訊號、20/60日高低、Pivot S1/R1 整合成新手易懂的參考區間。
        只做技術面解讀，不新增 API，也不將結果視為確定買賣訊號。 */
-    function computePloutosGuide(closes, sr) {
+    /* 🇹🇼 台灣證券交易價格升降單位
+       STOCK:
+       <10: 0.01 / 10~<50: 0.05 / 50~<100: 0.10 /
+       100~<500: 0.50 / 500~<1000: 1.00 / >=1000: 5.00
+       ETF / REITs / ETN:
+       <50: 0.01 / >=50: 0.05
+
+       PLOUTOS 建議價一律以「四捨五入到最近可成交檔位」處理。
+    */
+    function getTaiwanTickSize(price, instrumentType = 'STOCK') {
+        const p = Number(price);
+        if (!Number.isFinite(p) || p <= 0) return 0.01;
+
+        const type = String(instrumentType || 'STOCK').toUpperCase();
+        const isFundLike = type.includes('ETF') || type.includes('REIT') || type.includes('ETN');
+
+        if (isFundLike) {
+            return p < 50 ? 0.01 : 0.05;
+        }
+
+        if (p < 10) return 0.01;
+        if (p < 50) return 0.05;
+        if (p < 100) return 0.10;
+        if (p < 500) return 0.50;
+        if (p < 1000) return 1.00;
+        return 5.00;
+    }
+
+    function roundToTaiwanTick(price, instrumentType = 'STOCK') {
+        let value = Number(price);
+        if (!Number.isFinite(value) || value <= 0) return value;
+
+        // 先依原價級距四捨五入，再以結果級距重新確認一次，
+        // 避免剛好跨過 10 / 50 / 100 / 500 / 1000 元門檻時產生非法檔位。
+        for (let i = 0; i < 3; i++) {
+            const tick = getTaiwanTickSize(value, instrumentType);
+            const rounded = Math.round((value / tick) + Number.EPSILON) * tick;
+            value = Number(rounded.toFixed(tick < 0.1 ? 2 : tick < 1 ? 1 : 0));
+
+            const nextTick = getTaiwanTickSize(value, instrumentType);
+            const normalized = Math.round((value / nextTick) + Number.EPSILON) * nextTick;
+            const normalizedValue = Number(normalized.toFixed(nextTick < 0.1 ? 2 : nextTick < 1 ? 1 : 0));
+            if (Math.abs(normalizedValue - value) < 1e-9) break;
+            value = normalizedValue;
+        }
+        return value;
+    }
+
+    function computePloutosGuide(closes, sr, stockNo = null) {
         if (!closes || closes.length < 20 || !sr) return null;
 
         const latest = closes[closes.length - 1];
@@ -2487,13 +2532,41 @@
             defenseText = 'MA5 / MA10 / MA20 至少兩條下彎，支撐失守時應提高風險意識。';
         }
 
-        const risk = entryMid - stopLoss;
-        const reward = profitMid - entryMid;
-        const rr = risk > 0 ? reward / risk : null;
-        const riskPct = risk > 0 ? (risk / entryMid) * 100 : null;
-        const rewardPct = reward > 0 ? (reward / entryMid) * 100 : null;
+        // ===== 7) 台灣市場實際跳動單位正規化 =====
+        // 所有 PLOUTOS 可操作建議價，最後才統一四捨五入到合法檔位；
+        // Risk / Reward 也使用正規化後價格重新計算，避免畫面數字與模型不一致。
+        const instrumentType = stockNo ? getStockTypeForUI(stockNo) : 'STOCK';
 
-        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && profitMid > entryMid && rr > 0)) {
+        entryLow = roundToTaiwanTick(entryLow, instrumentType);
+        entryHigh = roundToTaiwanTick(entryHigh, instrumentType);
+        profitLow = roundToTaiwanTick(profitLow, instrumentType);
+        profitHigh = roundToTaiwanTick(profitHigh, instrumentType);
+        stopLoss = roundToTaiwanTick(stopLoss, instrumentType);
+        stopLossHigh = roundToTaiwanTick(stopLossHigh, instrumentType);
+        warningLevel = roundToTaiwanTick(warningLevel, instrumentType);
+
+        if (Number.isFinite(tp2Low)) tp2Low = roundToTaiwanTick(tp2Low, instrumentType);
+        if (Number.isFinite(tp2High)) tp2High = roundToTaiwanTick(tp2High, instrumentType);
+
+        // 維持區間順序與邏輯關係。
+        if (entryLow > entryHigh) [entryLow, entryHigh] = [entryHigh, entryLow];
+        if (profitLow > profitHigh) [profitLow, profitHigh] = [profitHigh, profitLow];
+        if (Number.isFinite(tp2Low) && Number.isFinite(tp2High) && tp2Low > tp2High) {
+            [tp2Low, tp2High] = [tp2High, tp2Low];
+        }
+        if (stopLoss > stopLossHigh) [stopLoss, stopLossHigh] = [stopLossHigh, stopLoss];
+
+        // 四捨五入後重新建立中心價。
+        const roundedEntryMid = (entryLow + entryHigh) / 2;
+        const roundedProfitMid = (profitLow + profitHigh) / 2;
+
+        const risk = roundedEntryMid - stopLoss;
+        const reward = roundedProfitMid - roundedEntryMid;
+        const rr = risk > 0 ? reward / risk : null;
+        const riskPct = risk > 0 ? (risk / roundedEntryMid) * 100 : null;
+        const rewardPct = reward > 0 ? (reward / roundedEntryMid) * 100 : null;
+
+        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && roundedProfitMid > roundedEntryMid && rr > 0)) {
             return { bias, trendScore, noSetup: true, reason: '目前價位結構缺乏合理的進場、停利與停損排列，建議等待更清楚的型態。' };
         }
 
@@ -2539,6 +2612,8 @@
             resistanceSources: resistanceCluster.map(x => x[0]),
             tp2Sources: tp2Cluster.map(x => x[0]),
             current: C,
+            instrumentType,
+            tickSizeEntry: getTaiwanTickSize(entryLow, instrumentType),
             entryPriorityText,
             exitStrategyText,
             allUpMomentum,
@@ -2623,7 +2698,7 @@
         actionEl.textContent = data.action.title;
         actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
         actionReason.textContent = data.action.reason;
-        statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜Exit含 Fib Extension`;
+        statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜Exit含 Fib Extension｜建議價已依台股跳動單位四捨五入`;
     }
 
     function updateTechnicalChart(closes) {
