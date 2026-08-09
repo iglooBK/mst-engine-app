@@ -314,6 +314,89 @@
         }
 
         /* ⚡ 股票代號主刷新鍵：與股票名稱輸入框同列，避免撐高整個控制卡片 */
+
+        /* 🔎 股票代號 / 名稱智慧搜尋 */
+        .portfolio-search-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+        }
+        .portfolio-search-wrap > input { width: 100%; }
+
+        .stock-search-dropdown {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: calc(100% + 5px);
+            z-index: 1200;
+            max-height: 320px;
+            overflow-y: auto;
+            background: #090c10;
+            border: 1px solid #2a364f;
+            border-radius: 4px;
+            box-shadow: 0 12px 28px rgba(0,0,0,.55), 0 0 12px rgba(6,182,212,.08);
+            display: none;
+        }
+        .stock-search-dropdown.show { display: block; }
+
+        .stock-search-item {
+            display: grid;
+            grid-template-columns: 78px minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+            padding: 9px 11px;
+            border-bottom: 1px solid #161e2e;
+            cursor: pointer;
+            user-select: none;
+            transition: background .12s ease, box-shadow .12s ease;
+        }
+        .stock-search-item:last-child { border-bottom: none; }
+        .stock-search-item:hover,
+        .stock-search-item.active {
+            background: #141c2b;
+            box-shadow: inset 3px 0 0 var(--accent-amber);
+        }
+        .stock-search-code {
+            color: var(--accent-amber);
+            font-weight: 800;
+            font-size: .82rem;
+            white-space: nowrap;
+        }
+        .stock-search-name {
+            min-width: 0;
+            color: #fff;
+            font-weight: 700;
+            font-size: .82rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .stock-search-meta {
+            color: var(--text-muted);
+            font-size: .66rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .stock-search-empty {
+            padding: 11px;
+            color: var(--text-muted);
+            font-size: .76rem;
+            text-align: center;
+        }
+        .stock-search-hint {
+            margin-top: 4px;
+            color: var(--text-muted);
+            font-size: .67rem;
+            letter-spacing: .15px;
+        }
+
+        @media (max-width: 680px) {
+            .stock-search-item {
+                grid-template-columns: 72px minmax(0, 1fr);
+            }
+            .stock-search-meta { grid-column: 2; }
+        }
+
         .portfolio-input-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -1687,9 +1770,16 @@
         <div class="config-item full-width">
             <label for="portfolioName">[PORTFOLIO NAME // 股票/組合名稱]</label>
             <div class="portfolio-input-row">
-                <input type="text" id="portfolioName" value="" placeholder="輸入代碼會自動帶入名稱（例如 2330 → 2330 台積電）" oninput="updatePortfolioDisplay()" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); refreshAllData(); }">
+                <div class="portfolio-search-wrap">
+                    <input type="text" id="portfolioName" value="" autocomplete="off"
+                           placeholder="輸入股票代號或名稱（例如 2330、台積電、元大）"
+                           oninput="handlePortfolioSearchInput()"
+                           onkeydown="handlePortfolioSearchKeydown(event)">
+                    <div id="stockSearchDropdown" class="stock-search-dropdown" role="listbox" aria-label="股票搜尋結果"></div>
+                </div>
                 <button type="button" class="btn-refresh-all" id="refreshAllDataBtn" onclick="refreshAllData()">⚡ 更新所有數據</button>
             </div>
+            <div class="stock-search-hint">可輸入代號或部分名稱搜尋，例如「2330」、「台積」、「元大」</div>
             <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
     </div>
@@ -4221,18 +4311,25 @@
     }
 
     function updatePortfolioDisplay() {
-        const portfolioName = document.getElementById('portfolioName').value.trim() || '未命名組合 (Draft)';
+        const rawValue = document.getElementById('portfolioName').value.trim();
+        const portfolioName = rawValue || '未命名組合 (Draft)';
+
         updatePortfolioStockMeta(portfolioName);
         document.getElementById('displayPortfolioBadge').textContent = `PORTFOLIO: ${portfolioName}`;
         document.getElementById('alertStockTitle').textContent = portfolioName;
-        
-        // 防抖動：當使用者停止輸入 600ms 後再自動搜尋新聞、均線、基本面與籌碼面，避免頻繁發送請求
+
+        // 名稱模糊搜尋過程（例如只輸入「元大」）不發送行情請求。
+        // 只有欄位內容已含有效股票代號，才執行原本的 600ms 自動更新。
         clearTimeout(newsDebounceTimer);
-        newsDebounceTimer = setTimeout(() => {
-            fetchStockNews(portfolioName);
-            fetchMovingAverages(portfolioName);
-            fetchFundamentals(portfolioName);
-        }, 600);
+        const stockCode = extractStockCode(rawValue);
+
+        if (stockCode && typeof lookupStockInfo === 'function' && lookupStockInfo(stockCode)) {
+            newsDebounceTimer = setTimeout(() => {
+                fetchStockNews(portfolioName);
+                fetchMovingAverages(portfolioName);
+                fetchFundamentals(portfolioName);
+            }, 600);
+        }
 
         calculate();
     }
@@ -4490,6 +4587,173 @@
         return match ? match[1] : null;
     }
 
+
+    /* 🔎 股票代號 / 股票名稱智慧模糊搜尋
+       直接使用 stock-list.js 的 STOCK_LIST 靜態主資料庫，不新增 API。 */
+    let stockSearchResults = [];
+    let stockSearchActiveIndex = -1;
+    let stockSearchBlurTimer = null;
+
+    function normalizeStockSearchText(value) {
+        return String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+    }
+
+    function searchStocksByKeyword(keyword, limit = 24) {
+        const q = normalizeStockSearchText(keyword);
+        if (!q || typeof STOCK_LIST === 'undefined' || !Array.isArray(STOCK_LIST)) return [];
+
+        const isCodeLike = /^[0-9A-Z]+$/i.test(q);
+        const ranked = [];
+
+        for (const item of STOCK_LIST) {
+            if (!item || !item.code || !item.name) continue;
+
+            const code = String(item.code).toUpperCase();
+            const name = String(item.name);
+            const nameNorm = normalizeStockSearchText(name);
+            let score = 999;
+
+            if (code === q) score = 0;
+            else if (nameNorm === q) score = 1;
+            else if (code.startsWith(q)) score = 2;
+            else if (nameNorm.startsWith(q)) score = 3;
+            else if (code.includes(q)) score = 4;
+            else if (nameNorm.includes(q)) score = 5;
+            else continue;
+
+            if (!isCodeLike && nameNorm.includes(q)) {
+                score = nameNorm.startsWith(q) ? 1 : 2;
+            }
+
+            ranked.push({ item, score });
+        }
+
+        ranked.sort((a, b) =>
+            a.score - b.score ||
+            String(a.item.name).localeCompare(String(b.item.name), 'zh-Hant') ||
+            String(a.item.code).localeCompare(String(b.item.code))
+        );
+
+        return ranked.slice(0, limit).map(x => x.item);
+    }
+
+    function closeStockSearchDropdown() {
+        const dropdown = document.getElementById('stockSearchDropdown');
+        if (dropdown) {
+            dropdown.classList.remove('show');
+            dropdown.innerHTML = '';
+        }
+        stockSearchResults = [];
+        stockSearchActiveIndex = -1;
+    }
+
+    function renderStockSearchDropdown(keyword) {
+        const dropdown = document.getElementById('stockSearchDropdown');
+        if (!dropdown) return;
+
+        const query = String(keyword || '').trim();
+        if (!query) {
+            closeStockSearchDropdown();
+            return;
+        }
+
+        stockSearchResults = searchStocksByKeyword(query);
+        stockSearchActiveIndex = -1;
+
+        if (!stockSearchResults.length) {
+            dropdown.innerHTML = '<div class="stock-search-empty">找不到符合的股票 / ETF</div>';
+            dropdown.classList.add('show');
+            return;
+        }
+
+        dropdown.innerHTML = stockSearchResults.map((item, index) => {
+            const info = (typeof lookupStockInfo === 'function') ? lookupStockInfo(item.code) : null;
+            const marketName = info?.marketName || (item.market === 'TPEx' ? '上櫃' : '上市');
+            const typeName = info?.typeName || item.type || '';
+            return `
+                <div class="stock-search-item" role="option" data-index="${index}"
+                     onmousedown="event.preventDefault(); selectStockSearchResult(${index});">
+                    <span class="stock-search-code">${item.code}</span>
+                    <span class="stock-search-name">${item.name}</span>
+                    <span class="stock-search-meta">${marketName}｜${typeName}</span>
+                </div>`;
+        }).join('');
+
+        dropdown.classList.add('show');
+    }
+
+    function updateStockSearchActiveItem() {
+        const dropdown = document.getElementById('stockSearchDropdown');
+        if (!dropdown) return;
+
+        const items = dropdown.querySelectorAll('.stock-search-item');
+        items.forEach((el, idx) => el.classList.toggle('active', idx === stockSearchActiveIndex));
+
+        if (stockSearchActiveIndex >= 0 && items[stockSearchActiveIndex]) {
+            items[stockSearchActiveIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function selectStockSearchResult(index) {
+        const item = stockSearchResults[index];
+        const input = document.getElementById('portfolioName');
+        if (!item || !input) return;
+
+        input.value = `${item.code} ${item.name}`;
+        closeStockSearchDropdown();
+        updatePortfolioStockMeta(input.value);
+
+        // 點選建議即視為完成選股，直接同步刷新所有卡片。
+        refreshAllData();
+    }
+
+    function handlePortfolioSearchInput() {
+        const input = document.getElementById('portfolioName');
+        if (!input) return;
+
+        updatePortfolioDisplay();
+        renderStockSearchDropdown(input.value);
+
+        clearTimeout(stockNameFillTimer);
+        stockNameFillTimer = setTimeout(autoFillStockName, 450);
+    }
+
+    function handlePortfolioSearchKeydown(event) {
+        const dropdown = document.getElementById('stockSearchDropdown');
+        const isOpen = dropdown && dropdown.classList.contains('show');
+
+        if (event.key === 'ArrowDown' && isOpen && stockSearchResults.length) {
+            event.preventDefault();
+            stockSearchActiveIndex = Math.min(stockSearchActiveIndex + 1, stockSearchResults.length - 1);
+            updateStockSearchActiveItem();
+            return;
+        }
+
+        if (event.key === 'ArrowUp' && isOpen && stockSearchResults.length) {
+            event.preventDefault();
+            stockSearchActiveIndex = stockSearchActiveIndex <= 0 ? 0 : stockSearchActiveIndex - 1;
+            updateStockSearchActiveItem();
+            return;
+        }
+
+        if (event.key === 'Escape' && isOpen) {
+            event.preventDefault();
+            closeStockSearchDropdown();
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+
+            if (isOpen && stockSearchResults.length) {
+                const idx = stockSearchActiveIndex >= 0 ? stockSearchActiveIndex : 0;
+                selectStockSearchResult(idx);
+            } else {
+                refreshAllData();
+            }
+        }
+    }
+
     function autoFillStockName() {
         const input = document.getElementById('portfolioName');
         if (!input) return;
@@ -4525,16 +4789,22 @@
         const input = document.getElementById('portfolioName');
         if (!input) return;
 
-        input.addEventListener('input', () => {
-            updatePortfolioStockMeta(input.value);
-            clearTimeout(stockNameFillTimer);
-            stockNameFillTimer = setTimeout(autoFillStockName, 450);
+        input.addEventListener('focus', () => {
+            if (input.value.trim()) renderStockSearchDropdown(input.value);
         });
 
         input.addEventListener('blur', () => {
             updatePortfolioStockMeta(input.value);
             clearTimeout(stockNameFillTimer);
             autoFillStockName();
+
+            clearTimeout(stockSearchBlurTimer);
+            stockSearchBlurTimer = setTimeout(closeStockSearchDropdown, 120);
+        });
+
+        document.addEventListener('mousedown', (event) => {
+            const wrap = document.querySelector('.portfolio-search-wrap');
+            if (wrap && !wrap.contains(event.target)) closeStockSearchDropdown();
         });
     }
 
