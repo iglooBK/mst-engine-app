@@ -718,6 +718,139 @@
             font-weight: 500;
         }
 
+
+        /* 🇹🇼 MARKET PULSE // 台股大盤 */
+        .market-pulse-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .market-pulse-item {
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 11px 9px;
+            text-align: center;
+            min-width: 0;
+        }
+
+        .market-pulse-item label {
+            display: block;
+            color: var(--text-label);
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .4px;
+            margin-bottom: 5px;
+        }
+
+        .market-pulse-item .value {
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+
+        .market-pulse-item .sub {
+            margin-top: 4px;
+            color: var(--text-muted);
+            font-size: .67rem;
+            font-weight: 600;
+            min-height: 1em;
+        }
+
+        .market-pulse-item .value.up,
+        .market-pulse-item .sub.up { color: var(--profit-color); }
+
+        .market-pulse-item .value.down,
+        .market-pulse-item .sub.down { color: var(--loss-color); }
+
+        .market-pulse-item .value.neutral,
+        .market-pulse-item .sub.neutral { color: var(--text-muted); }
+
+        .market-pulse-basis.positive {
+            border-color: rgba(255,59,48,.55);
+            box-shadow: inset 0 0 12px rgba(255,59,48,.06);
+        }
+
+        .market-pulse-basis.negative {
+            border-color: rgba(52,199,89,.55);
+            box-shadow: inset 0 0 12px rgba(52,199,89,.06);
+        }
+
+        .market-ma-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .market-ma-item {
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .market-ma-item label {
+            display: block;
+            color: var(--text-label);
+            font-size: .64rem;
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+
+        .market-ma-item .value {
+            color: var(--accent-cyan);
+            font-size: .92rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .market-trend-banner {
+            margin-top: 10px;
+            padding: 9px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--card-border);
+            background: #0d131f;
+            text-align: center;
+            font-size: .76rem;
+            font-weight: 800;
+            letter-spacing: .3px;
+        }
+
+        .market-trend-banner.bullish {
+            color: var(--profit-color);
+            border-color: rgba(255,59,48,.55);
+            background: rgba(255,59,48,.07);
+        }
+
+        .market-trend-banner.bearish {
+            color: var(--loss-color);
+            border-color: rgba(52,199,89,.55);
+            background: rgba(52,199,89,.07);
+        }
+
+        .market-trend-banner.neutral {
+            color: var(--text-muted);
+        }
+
+        .market-pulse-source {
+            margin-top: 9px;
+            color: var(--text-muted);
+            font-size: .64rem;
+            line-height: 1.55;
+        }
+
+        @media (max-width: 760px) {
+            .market-pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .market-ma-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
         /* 📈 均線分析區塊樣式 */
         /* 📊 最新收盤價（含漲跌幅）顯示框 */
         .latest-price-box {
@@ -1812,6 +1945,63 @@
         </div>
     </div>
 
+    <!-- 🇹🇼 MARKET PULSE：TAIEX / TX / BASIS -->
+    <div class="news-card" id="marketPulseCard">
+        <div class="news-header-title">
+            <h3>🇹🇼 MARKET PULSE // 台股大盤・加權指數・台指期</h3>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn-secondary" style="font-size:0.7rem; padding:2px 6px;" onclick="refreshMarketPulse()">🔄 重新整理</button>
+                <button class="btn-collapse-toggle" id="marketPulseCollapseBtn" onclick="toggleCardCollapse('marketPulseCard','marketPulseCollapseBtn')">▲ 收合</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="marketPulseStatus" style="font-size:.72rem; color:var(--text-muted); margin-bottom:8px;">
+                尚未載入大盤資料
+            </div>
+
+            <div class="market-pulse-grid">
+                <div class="market-pulse-item">
+                    <label>TAIEX // 加權指數</label>
+                    <div class="value neutral" id="mpTaiexValue">--</div>
+                    <div class="sub neutral" id="mpTaiexChange">--</div>
+                </div>
+
+                <div class="market-pulse-item">
+                    <label>TX FRONT // 台指期近月</label>
+                    <div class="value neutral" id="mpTxValue">--</div>
+                    <div class="sub neutral" id="mpTxChange">--</div>
+                </div>
+
+                <div class="market-pulse-item market-pulse-basis" id="mpBasisBox">
+                    <label>BASIS // 期現貨價差</label>
+                    <div class="value neutral" id="mpBasisValue">--</div>
+                    <div class="sub neutral" id="mpBasisLabel">等待資料</div>
+                </div>
+
+                <div class="market-pulse-item">
+                    <label>TX CONTRACT // 近月契約</label>
+                    <div class="value neutral" id="mpTxContract">--</div>
+                    <div class="sub neutral" id="mpMarketDate">--</div>
+                </div>
+            </div>
+
+            <div class="market-ma-grid">
+                <div class="market-ma-item"><label>TAIEX MA5</label><div class="value" id="mpMa5">--</div></div>
+                <div class="market-ma-item"><label>TAIEX MA10</label><div class="value" id="mpMa10">--</div></div>
+                <div class="market-ma-item"><label>TAIEX MA20</label><div class="value" id="mpMa20">--</div></div>
+                <div class="market-ma-item"><label>TAIEX MA60</label><div class="value" id="mpMa60">--</div></div>
+            </div>
+
+            <div class="market-trend-banner neutral" id="mpTrendBanner">
+                MARKET TREND // 等待資料
+            </div>
+
+            <div class="market-pulse-source" id="mpSourceText">
+                DATA SOURCE // TWSE OpenAPI + TAIFEX OpenAPI｜盤後 / 官方可取得行情
+            </div>
+        </div>
+    </div>
+
     <!-- 📈 MOVING AVERAGES 均線分析區塊 -->
     <div class="news-card">
         <div class="news-header-title">
@@ -2580,6 +2770,332 @@
             renderSupportResistance(null);
             renderPloutosGuide(null);
             renderLatestPrice(null);
+        }
+    }
+
+
+    /* 🇹🇼 MARKET PULSE // TWSE 加權指數 + TAIFEX 台指期近月
+       官方資料：
+       TWSE  /v1/indicesReport/MI_5MINS_HIST
+       TAIFEX /v1/DailyMarketReportFut
+       本卡片為盤後 / 官方 OpenAPI 可取得資料，不宣稱交易所授權即時報價。 */
+    const PLOUTOS_TAIEX_API = 'https://openapi.twse.com.tw/v1/indicesReport/MI_5MINS_HIST';
+    const PLOUTOS_TX_API = 'https://openapi.taifex.com.tw/v1/DailyMarketReportFut';
+
+    function mpFirst(row, keys, matcher = null) {
+        if (!row || typeof row !== 'object') return '';
+        for (const key of keys) {
+            if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+                return String(row[key]).trim();
+            }
+        }
+        if (matcher) {
+            const found = Object.keys(row).find(k => matcher(String(k)));
+            if (found && row[found] !== undefined && row[found] !== null) {
+                return String(row[found]).trim();
+            }
+        }
+        return '';
+    }
+
+    function mpNumber(value) {
+        if (value === undefined || value === null) return null;
+        const cleaned = String(value).replace(/,/g, '').replace(/%/g, '').trim();
+        if (!cleaned || cleaned === '--' || cleaned === '-' || cleaned.toLowerCase() === 'nan') return null;
+        const n = Number(cleaned);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    function mpNormalizeDate(value) {
+        const s = String(value || '').trim();
+        if (!s) return '';
+        const digits = s.replace(/\D/g, '');
+        if (digits.length === 8) return `${digits.slice(0,4)}/${digits.slice(4,6)}/${digits.slice(6,8)}`;
+        if (digits.length === 7) {
+            const roc = Number(digits.slice(0,3));
+            if (Number.isFinite(roc)) return `${roc + 1911}/${digits.slice(3,5)}/${digits.slice(5,7)}`;
+        }
+        return s;
+    }
+
+    function mpSetDirection(valueEl, subEl, change) {
+        const cls = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
+        if (valueEl) valueEl.className = `value ${cls}`;
+        if (subEl) subEl.className = `sub ${cls}`;
+    }
+
+    function mpFormat(n, digits = 2) {
+        if (!Number.isFinite(n)) return '--';
+        return n.toLocaleString('zh-TW', {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+        });
+    }
+
+    function mpSma(values, period) {
+        const clean = values.filter(Number.isFinite);
+        if (clean.length < period) return null;
+        const slice = clean.slice(-period);
+        return slice.reduce((a, b) => a + b, 0) / period;
+    }
+
+    function parseTaiexHistory(rows) {
+        if (!Array.isArray(rows)) return [];
+        const parsed = [];
+
+        for (const row of rows) {
+            const date = mpNormalizeDate(mpFirst(
+                row,
+                ['Date', 'date', '日期', '資料日期'],
+                k => /date|日期/i.test(k)
+            ));
+
+            const close = mpNumber(mpFirst(
+                row,
+                ['ClosingIndex', 'Close', 'ClosingPrice', 'TAIEX', '發行量加權股價指數', '收盤指數', '收盤價'],
+                k => /closing.*index|close|收盤.*指數|發行量加權股價指數/i.test(k)
+            ));
+
+            if (date && Number.isFinite(close)) parsed.push({ date, close });
+        }
+
+        parsed.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        const dedup = [];
+        const seen = new Set();
+        for (const item of parsed) {
+            if (seen.has(item.date)) continue;
+            seen.add(item.date);
+            dedup.push(item);
+        }
+        return dedup;
+    }
+
+    function parseTxFront(rows) {
+        if (!Array.isArray(rows)) return null;
+
+        const candidates = [];
+        for (const row of rows) {
+            const product = mpFirst(
+                row,
+                ['Contract', 'ContractCode', 'CommodityID', '商品代號', '契約'],
+                k => /contract|commodity|商品|契約/i.test(k)
+            ).toUpperCase();
+
+            const productName = mpFirst(
+                row,
+                ['ContractName', 'CommodityName', '商品名稱', '契約名稱'],
+                k => /name|名稱/i.test(k)
+            );
+
+            const isTx = product === 'TX' ||
+                         /^TXF?$/.test(product) ||
+                         /臺股期貨|台股期貨/.test(productName);
+            if (!isTx) continue;
+
+            const month = mpFirst(
+                row,
+                ['DeliveryMonth', 'ContractMonth', 'ExpirationMonth', '到期月份(週別)', '到期月份', '契約月份'],
+                k => /delivery.*month|contract.*month|expiration.*month|到期.*月|契約.*月/i.test(k)
+            );
+
+            // 排除價差契約、週別或特殊組合；優先一般 YYYYMM 月契約。
+            const monthDigits = String(month).replace(/\D/g, '');
+            if (String(month).includes('/') || String(month).includes('-')) continue;
+
+            const close = mpNumber(mpFirst(
+                row,
+                ['ClosingPrice', 'Close', '收盤價'],
+                k => /closing.*price|close|收盤價/i.test(k)
+            ));
+
+            const change = mpNumber(mpFirst(
+                row,
+                ['Change', 'ChangeAmount', '漲跌', '漲跌點數'],
+                k => /change.*amount|^change$|漲跌/i.test(k)
+            ));
+
+            const changePct = mpNumber(mpFirst(
+                row,
+                ['ChangePercent', 'ChangeRate', '漲跌幅', '漲跌幅(%)'],
+                k => /change.*percent|change.*rate|漲跌幅/i.test(k)
+            ));
+
+            const date = mpNormalizeDate(mpFirst(
+                row,
+                ['Date', 'TradeDate', '交易日期', '日期'],
+                k => /trade.*date|^date$|交易日期|日期/i.test(k)
+            ));
+
+            if (!Number.isFinite(close)) continue;
+            candidates.push({ product, productName, month, monthDigits, close, change, changePct, date, raw: row });
+        }
+
+        if (!candidates.length) return null;
+
+        // 最新交易日優先，再選最小月份（近月）。
+        candidates.sort((a, b) => {
+            const d = String(b.date).localeCompare(String(a.date));
+            if (d !== 0) return d;
+            const am = a.monthDigits || '99999999';
+            const bm = b.monthDigits || '99999999';
+            return am.localeCompare(bm);
+        });
+
+        const latestDate = candidates[0].date;
+        const sameDate = candidates.filter(x => x.date === latestDate);
+        const monthly = sameDate.filter(x => /^\d{6}$/.test(x.monthDigits));
+        return (monthly.length ? monthly : sameDate)[0];
+    }
+
+    async function fetchJsonOfficial(url) {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return Array.isArray(data) ? data :
+               Array.isArray(data?.data) ? data.data :
+               Array.isArray(data?.Data) ? data.Data : [];
+    }
+
+    function renderMarketPulseTrend(latest, ma5, ma10, ma20, ma60, basis) {
+        const banner = document.getElementById('mpTrendBanner');
+        if (!banner) return;
+
+        let score = 0;
+        if (Number.isFinite(latest) && Number.isFinite(ma5)) score += latest >= ma5 ? 1 : -1;
+        if (Number.isFinite(ma5) && Number.isFinite(ma20)) score += ma5 >= ma20 ? 1 : -1;
+        if (Number.isFinite(ma20) && Number.isFinite(ma60)) score += ma20 >= ma60 ? 1 : -1;
+        if (Number.isFinite(basis)) score += basis >= 0 ? 1 : -1;
+
+        let cls = 'neutral';
+        let text = '中性整理';
+        if (score >= 3) { cls = 'bullish'; text = '偏多格局'; }
+        else if (score <= -3) { cls = 'bearish'; text = '偏空格局'; }
+        else if (score > 0) { text = '震盪偏多'; }
+        else if (score < 0) { text = '震盪偏空'; }
+
+        banner.className = `market-trend-banner ${cls}`;
+        banner.textContent = `MARKET TREND // ${text}｜TAIEX 均線 + TX BASIS 綜合判讀`;
+    }
+
+    async function refreshMarketPulse() {
+        const status = document.getElementById('marketPulseStatus');
+        if (status) status.textContent = '📡 正在讀取 TWSE / TAIFEX 官方盤後資料...';
+
+        const taiexPromise = fetchJsonOfficial(PLOUTOS_TAIEX_API);
+        const txPromise = fetchJsonOfficial(PLOUTOS_TX_API);
+        const results = await Promise.allSettled([taiexPromise, txPromise]);
+
+        let taiexHistory = [];
+        let tx = null;
+        const errors = [];
+
+        if (results[0].status === 'fulfilled') {
+            taiexHistory = parseTaiexHistory(results[0].value);
+            if (!taiexHistory.length) errors.push('TWSE 格式無可辨識 TAIEX 資料');
+        } else {
+            errors.push(`TWSE: ${results[0].reason?.message || '讀取失敗'}`);
+        }
+
+        if (results[1].status === 'fulfilled') {
+            tx = parseTxFront(results[1].value);
+            if (!tx) errors.push('TAIFEX 找不到 TX 近月');
+        } else {
+            errors.push(`TAIFEX: ${results[1].reason?.message || '讀取失敗'}`);
+        }
+
+        const latest = taiexHistory.at(-1) || null;
+        const prev = taiexHistory.length >= 2 ? taiexHistory.at(-2) : null;
+        const closes = taiexHistory.map(x => x.close);
+
+        const ma5 = mpSma(closes, 5);
+        const ma10 = mpSma(closes, 10);
+        const ma20 = mpSma(closes, 20);
+        const ma60 = mpSma(closes, 60);
+
+        const taiexChange = latest && prev ? latest.close - prev.close : null;
+        const taiexPct = latest && prev && prev.close ? (taiexChange / prev.close) * 100 : null;
+
+        const taiexValueEl = document.getElementById('mpTaiexValue');
+        const taiexChangeEl = document.getElementById('mpTaiexChange');
+        if (latest) {
+            taiexValueEl.textContent = mpFormat(latest.close, 2);
+            taiexChangeEl.textContent = Number.isFinite(taiexChange)
+                ? `${taiexChange >= 0 ? '+' : ''}${mpFormat(taiexChange, 2)} (${taiexPct >= 0 ? '+' : ''}${mpFormat(taiexPct, 2)}%)`
+                : `資料日 ${latest.date}`;
+            mpSetDirection(taiexValueEl, taiexChangeEl, taiexChange || 0);
+        } else {
+            taiexValueEl.textContent = '--';
+            taiexChangeEl.textContent = 'TWSE 無資料';
+            mpSetDirection(taiexValueEl, taiexChangeEl, 0);
+        }
+
+        const txValueEl = document.getElementById('mpTxValue');
+        const txChangeEl = document.getElementById('mpTxChange');
+        if (tx) {
+            txValueEl.textContent = mpFormat(tx.close, 0);
+            const txChangeText = Number.isFinite(tx.change)
+                ? `${tx.change >= 0 ? '+' : ''}${mpFormat(tx.change, 0)}${Number.isFinite(tx.changePct) ? ` (${tx.changePct >= 0 ? '+' : ''}${mpFormat(tx.changePct,2)}%)` : ''}`
+                : `資料日 ${tx.date || '--'}`;
+            txChangeEl.textContent = txChangeText;
+            mpSetDirection(txValueEl, txChangeEl, tx.change || 0);
+            document.getElementById('mpTxContract').textContent = tx.month || 'TX';
+        } else {
+            txValueEl.textContent = '--';
+            txChangeEl.textContent = 'TAIFEX 無資料';
+            mpSetDirection(txValueEl, txChangeEl, 0);
+            document.getElementById('mpTxContract').textContent = '--';
+        }
+
+        const basis = latest && tx ? tx.close - latest.close : null;
+        const basisBox = document.getElementById('mpBasisBox');
+        const basisValue = document.getElementById('mpBasisValue');
+        const basisLabel = document.getElementById('mpBasisLabel');
+        basisBox.classList.remove('positive', 'negative');
+
+        if (Number.isFinite(basis)) {
+            basisValue.textContent = `${basis >= 0 ? '+' : ''}${mpFormat(basis, 2)}`;
+            if (basis > 0) {
+                basisLabel.textContent = '正價差 // FUTURES PREMIUM';
+                basisValue.className = 'value up';
+                basisLabel.className = 'sub up';
+                basisBox.classList.add('positive');
+            } else if (basis < 0) {
+                basisLabel.textContent = '逆價差 // FUTURES DISCOUNT';
+                basisValue.className = 'value down';
+                basisLabel.className = 'sub down';
+                basisBox.classList.add('negative');
+            } else {
+                basisLabel.textContent = '平價差 // FLAT';
+                basisValue.className = 'value neutral';
+                basisLabel.className = 'sub neutral';
+            }
+        } else {
+            basisValue.textContent = '--';
+            basisLabel.textContent = '等待 TAIEX + TX';
+            basisValue.className = 'value neutral';
+            basisLabel.className = 'sub neutral';
+        }
+
+        document.getElementById('mpMa5').textContent = Number.isFinite(ma5) ? mpFormat(ma5, 2) : '--';
+        document.getElementById('mpMa10').textContent = Number.isFinite(ma10) ? mpFormat(ma10, 2) : '--';
+        document.getElementById('mpMa20').textContent = Number.isFinite(ma20) ? mpFormat(ma20, 2) : '--';
+        document.getElementById('mpMa60').textContent = Number.isFinite(ma60) ? mpFormat(ma60, 2) : '--';
+
+        const dateBits = [];
+        if (latest?.date) dateBits.push(`TAIEX ${latest.date}`);
+        if (tx?.date) dateBits.push(`TX ${tx.date}`);
+        document.getElementById('mpMarketDate').textContent = dateBits.join('｜') || '--';
+
+        renderMarketPulseTrend(latest?.close, ma5, ma10, ma20, ma60, basis);
+
+        if (status) {
+            status.textContent = errors.length
+                ? `⚠️ ${errors.join('｜')}｜其餘可用資料已顯示`
+                : `✅ 官方盤後資料載入完成｜TAIEX ${latest?.date || '--'}｜TX ${tx?.date || '--'}`;
         }
     }
 
@@ -5051,6 +5567,15 @@
                 .catch(() => {});
         });
     }
+
+    // 🇹🇼 MARKET PULSE 初始載入：不阻塞其他 PLOUTOS 功能。
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            try { refreshMarketPulse(); }
+            catch (e) { console.warn('Market Pulse initial load failed:', e); }
+        }, 900);
+    });
+
 </script>
 
 </body>
