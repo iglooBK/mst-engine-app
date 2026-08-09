@@ -2499,6 +2499,12 @@
         return value;
     }
 
+
+        // PLOUTOS ROADMAP (not yet active):
+        // 1) TP2 two-day breakout confirmation
+        // 2) Institutional / margin chip confirmation layer
+        // 3) Market regime / relative-strength filter
+
     function computePloutosGuide(closes, sr, stockNo = null) {
         if (!closes || closes.length < 20 || !sr) return null;
 
@@ -2558,6 +2564,17 @@
         const volMA5 = avgVolume(priorBars.slice(-5));
         const volMA20 = avgVolume(priorBars.slice(-20));
         const volMA60 = avgVolume(priorBars.slice(-60));
+
+        // Liquidity is measured by average traded VALUE, not share count.
+        // This normalizes liquidity across low-price and high-price stocks.
+        const LIQUIDITY_TURNOVER_THRESHOLD = 20000000; // NT$20M, intentionally easy to tune later.
+        const prior20Bars = priorBars.slice(-20);
+        const turnover20 = prior20Bars
+            .map(x => Number(x.volume) * Number(x.close))
+            .filter(v => Number.isFinite(v) && v >= 0);
+        const avgTurnover20 = turnover20.length
+            ? turnover20.reduce((a,b) => a + b, 0) / turnover20.length
+            : null;
         const volRatio = (Number.isFinite(volToday) && Number.isFinite(volMA5) && volMA5 > 0)
             ? volToday / volMA5
             : null;
@@ -2586,30 +2603,77 @@
         const smallBody = candleRange > 0 ? candleBody / candleRange <= 0.25 : true;
 
         // Executable candlestick definitions:
-        // Long lower wick = lower wick >= 2x body AND close in upper third of day's range.
-        // Long upper wick = upper wick >= 2x body AND close in lower third of day's range.
+        // Long lower wick =
+        //   lower wick >= 2x real body
+        //   AND lower wick >= close * 0.5% (absolute noise filter for doji / tiny-body days)
+        //   AND close is in upper third of the day's range.
+        // Long upper wick is the exact mirror condition.
         const closeInUpperThird = candleRange > 0 && C >= L + candleRange * (2/3);
         const closeInLowerThird = candleRange > 0 && C <= L + candleRange * (1/3);
-        const longLowerWick = candleRange > 0 && lowerWick >= Math.max(candleBody * 2, candleRange * 0.20) && closeInUpperThird;
-        const longUpperWick = candleRange > 0 && upperWick >= Math.max(candleBody * 2, candleRange * 0.20) && closeInLowerThird;
+        const wickAbsoluteFloor = Math.max(C * 0.005, getTaiwanTickSize(C, instrumentTypeForVolume));
+        const longLowerWick = candleRange > 0
+            && lowerWick >= candleBody * 2
+            && lowerWick >= wickAbsoluteFloor
+            && closeInUpperThird;
+        const longUpperWick = candleRange > 0
+            && upperWick >= candleBody * 2
+            && upperWick >= wickAbsoluteFloor
+            && closeInLowerThird;
 
-        // Bullish engulfing: today's real body fully engulfs yesterday's real body.
+        // Bullish engulfing: today's green real body fully engulfs yesterday's red real body.
         const bullishEngulfing = Number.isFinite(prevClose) && Number.isFinite(prevOpen)
             && bullishCandle && prevClose < prevOpen
             && O <= prevClose && C >= prevOpen;
 
-        // Taiwan limit-day special handling: use close-to-close move; 9.5% is treated as near-limit.
+        // Bearish engulfing: today's red real body fully engulfs yesterday's green real body.
+        const bearishEngulfing = Number.isFinite(prevClose) && Number.isFinite(prevOpen)
+            && bearishCandle && prevClose > prevOpen
+            && O >= prevClose && C <= prevOpen;
+
+        // Taiwan price-limit special handling.
+        // Guard 1: first 5 trading days of a newly listed ordinary stock do not use the normal ±10% interpretation.
+        // Guard 2: ETF / REIT / ETN products are not forced into the ordinary-stock ±10% shortcut.
         const dayChangePct = Number.isFinite(prevClose) && prevClose > 0 ? ((C - prevClose) / prevClose) * 100 : null;
-        const nearLimitUp = Number.isFinite(dayChangePct) && dayChangePct >= 9.5;
-        const nearLimitDown = Number.isFinite(dayChangePct) && dayChangePct <= -9.5;
+
+        // Prefer a listing-date field if the stock database provides one. Current history-length fallback is future-proof:
+        // computePloutosGuide presently requires >=20 bars, so it will not falsely label a brand-new stock as limit-up/down.
+        let listingDate = null;
+        try {
+            if (stockNo && typeof lookupStockInfo === 'function') {
+                const info = lookupStockInfo(stockNo);
+                const rawListingDate = info?.listingDate || info?.listDate || info?.listedDate || info?.上市日期 || null;
+                if (rawListingDate) {
+                    const d = new Date(rawListingDate);
+                    if (!Number.isNaN(d.getTime())) listingDate = d;
+                }
+            }
+        } catch (e) {}
+
+        const availableTradingAge = closes.length;
+        let isFirstFiveTradingDays = availableTradingAge <= 5;
+        if (listingDate && latest?.date instanceof Date) {
+            const barsSinceListing = closes.filter(x => x.date instanceof Date && x.date >= listingDate && x.date <= latest.date).length;
+            if (barsSinceListing > 0) isFirstFiveTradingDays = barsSinceListing <= 5;
+        }
+
+        const typeUpper = String(instrumentTypeForVolume || 'STOCK').toUpperCase();
+        const isFundLikeForLimit = typeUpper.includes('ETF') || typeUpper.includes('REIT') || typeUpper.includes('ETN');
+        const ordinaryStockLimitRuleEligible = !isFirstFiveTradingDays && !isFundLikeForLimit;
+
+        const nearLimitUp = ordinaryStockLimitRuleEligible && Number.isFinite(dayChangePct) && dayChangePct >= 9.5;
+        const nearLimitDown = ordinaryStockLimitRuleEligible && Number.isFinite(dayChangePct) && dayChangePct <= -9.5;
 
         const volumeInfo = {
             available: Number.isFinite(volRatio) && validVolumes.length >= 21,
             volToday, volMA5, volMA20, volMA60, volRatio,
             state: volumeState,
-            bullishCandle, bearishCandle, smallBody, longLowerWick, longUpperWick, bullishEngulfing,
+            bullishCandle, bearishCandle, smallBody, longLowerWick, longUpperWick,
+            bullishEngulfing, bearishEngulfing,
             dayChangePct, nearLimitUp, nearLimitDown,
-            lowLiquidity: Number.isFinite(volMA20) && volMA20 < 500000,
+            isFirstFiveTradingDays,
+            ordinaryStockLimitRuleEligible,
+            avgTurnover20,
+            lowLiquidity: Number.isFinite(avgTurnover20) && avgTurnover20 < LIQUIDITY_TURNOVER_THRESHOLD,
             entryConfidence: 0,
             entryText: '',
             trendAdjustment: 0,
@@ -2626,12 +2690,12 @@
             const highTolerance = Math.max(prior20High * 0.003, getTaiwanTickSize(prior20High, instrumentTypeForVolume));
             const lowTolerance = Math.max(prior20Low * 0.003, getTaiwanTickSize(prior20Low, instrumentTypeForVolume));
 
-            if (Number.isFinite(prior20High) && C >= prior20High + highTolerance && volMA5 < volMA20) {
+            if (Number.isFinite(prior20High) && C >= prior20High + highTolerance && volMA5 <= volMA20 * 0.85) {
                 volumeInfo.trendAdjustment -= 1;
-                volumeInfo.divergenceText = '收盤創20日新高但5日均量低於20日均量：量價背離，頂部警訊';
-            } else if (Number.isFinite(prior20Low) && C <= prior20Low - lowTolerance && volMA5 < volMA20) {
+                volumeInfo.divergenceText = '收盤創20日新高且5日均量至少低於20日均量15%：量價背離，頂部警訊';
+            } else if (Number.isFinite(prior20Low) && C <= prior20Low - lowTolerance && volMA5 <= volMA20 * 0.85) {
                 volumeInfo.trendAdjustment += 1;
-                volumeInfo.divergenceText = '收盤創20日新低但5日均量低於20日均量：量能背離，賣壓衰竭訊號';
+                volumeInfo.divergenceText = '收盤創20日新低且5日均量至少低於20日均量15%：量能背離，賣壓衰竭訊號';
             }
         }
 
@@ -2950,7 +3014,65 @@
         const riskPct = risk > 0 ? (risk / roundedEntryMid) * 100 : null;
         const rewardPct = reward > 0 ? (reward / roundedEntryMid) * 100 : null;
 
-        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && roundedProfitMid > roundedEntryMid && rr > 0)) {
+        // ===== 7B) NET R/R：扣除實際交易成本 =====
+        // Use current entered position quantity when available; otherwise use 100 shares as a transparent odd-lot model.
+        const discountForRR = parseFloat(document.getElementById('discount')?.value) || 0.3;
+        const minFeeForRR = parseFloat(document.getElementById('minFee')?.value) || 0;
+        let rrQty = 0;
+        document.querySelectorAll('#tradeTableBody tr').forEach(row => {
+            if (row.dataset.hidden === 'true') return;
+            const q = parseFloat(row.querySelector('.qty-input')?.value) || 0;
+            if (q > 0) rrQty += q;
+        });
+        const rrQtySource = rrQty > 0 ? '目前輸入股數' : '100股模型部位';
+        if (rrQty <= 0) rrQty = 100;
+
+        const typeForTax = String(instrumentType || 'STOCK').toUpperCase();
+        const rrSellTaxRate = (typeForTax.includes('ETF') || typeForTax.includes('ETN') || typeForTax.includes('REIT'))
+            ? 0.001
+            : 0.003;
+
+        const rrFee = (amount) => {
+            if (!(amount > 0)) return 0;
+            const calculated = Math.floor(amount * BASE_FEE_RATE * discountForRR);
+            return Math.max(minFeeForRR, calculated);
+        };
+        const rrTax = (amount) => amount > 0 ? Math.floor(amount * rrSellTaxRate) : 0;
+
+        const entryAmountRR = roundedEntryMid * rrQty;
+        const tp1AmountRR = roundedProfitMid * rrQty;
+        const stopAmountRR = stopLoss * rrQty;
+
+        const buyFeeRR = rrFee(entryAmountRR);
+        const tpSellFeeRR = rrFee(tp1AmountRR);
+        const stopSellFeeRR = rrFee(stopAmountRR);
+        const tpTaxRR = rrTax(tp1AmountRR);
+        const stopTaxRR = rrTax(stopAmountRR);
+
+        const grossRewardAmountRR = (roundedProfitMid - roundedEntryMid) * rrQty;
+        const grossRiskAmountRR = (roundedEntryMid - stopLoss) * rrQty;
+
+        const netRewardAmountRR = grossRewardAmountRR - buyFeeRR - tpSellFeeRR - tpTaxRR;
+        const netRiskAmountRR = grossRiskAmountRR + buyFeeRR + stopSellFeeRR + stopTaxRR;
+        const netRR = netRiskAmountRR > 0 ? netRewardAmountRR / netRiskAmountRR : null;
+
+        const transactionCostInfo = {
+            rrQty,
+            rrQtySource,
+            discountForRR,
+            minFeeForRR,
+            rrSellTaxRate,
+            buyFeeRR,
+            tpSellFeeRR,
+            stopSellFeeRR,
+            tpTaxRR,
+            stopTaxRR,
+            netRewardAmountRR,
+            netRiskAmountRR,
+            netRR
+        };
+
+        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && roundedProfitMid > roundedEntryMid && rr > 0 && Number.isFinite(netRR) && netRR > 0)) {
             return { bias, trendScore, noSetup: true, reason: '目前價位結構缺乏合理的進場、停利與停損排列，建議等待更清楚的型態。' };
         }
 
@@ -2978,6 +3100,9 @@
                 volumeInfo.entryConfidence = 2;
                 const patternText = longLowerWick ? '長下影承接' : (bullishEngulfing ? '看漲吞噬' : '收紅');
                 volumeInfo.entryText = `${volumeState.label} + ${patternText}：買盤承接明確，Entry 信心 +2`;
+            } else if (volRatio >= 1.5 && bearishEngulfing && C <= entryLow) {
+                volumeInfo.entryConfidence = -2;
+                volumeInfo.entryText = `${volumeState.label} + 看跌吞噬並跌破 Entry：反轉賣壓明確，Entry 信心 -2`;
             } else if (volRatio >= 1.5 && bearishCandle && C < entryLow) {
                 volumeInfo.entryConfidence = -2;
                 volumeInfo.entryText = `${volumeState.label} + 收黑破底：收盤低於開盤且跌破 Entry 下緣，Entry 信心 -2`;
@@ -2995,7 +3120,7 @@
             // negative warnings remain active for risk control.
             if (volumeInfo.lowLiquidity) {
                 if (volumeInfo.entryConfidence > 0) volumeInfo.entryConfidence = 0;
-                volumeInfo.entryText += '｜⚠️ 20日均量低於500張，低流動性，量能加分停用';
+                volumeInfo.entryText += '｜⚠️ 前20日平均成交金額低於NT$20M，低流動性，量能加分停用';
             }
         }
 
@@ -3008,6 +3133,10 @@
             } else {
                 volumeInfo.breakdownText = `⚠️ 疑似假跌破：收盤跌破但 VolRatio ${formatNumber(volRatio, 2)} < 1.30，轉 DEFENSIVE 並觀察1日`;
             }
+        }
+
+        if (volumeInfo.available && supportBroken && bearishEngulfing) {
+            volumeInfo.breakdownText += `${volumeInfo.breakdownText ? '｜' : ''}看跌吞噬：K棒同步確認賣壓`;
         }
 
         // A3. 真 / 假突破確認
@@ -3035,9 +3164,9 @@
             action = { cls: 'bearish', title: '🔴 RISK OFF // 風險偏高', reason: '均線結構偏弱，接近支撐也建議先觀察止跌或重新站回短期均線。' };
         } else if (distanceToProfitPct >= 0 && distanceToProfitPct <= 2.0) {
             action = { cls: 'neutral', title: '🟠 AVOID CHASING // 不宜追價', reason: '現價已靠近第一壓力/停利區，追價後的風險報酬空間較差。' };
-        } else if (C >= entryLow && C <= entryHigh * 1.006 && trendScore >= 3 && rr >= 2) {
+        } else if (C >= entryLow && C <= entryHigh * 1.006 && trendScore >= 3 && netRR >= 2) {
             action = { cls: 'bullish', title: '🟢 FAVORABLE ENTRY // 偏佳建倉', reason: '趨勢偏多、價格接近支撐群聚，且風險報酬比達 1:2 以上；仍建議分批而非一次投入。' };
-        } else if (distanceToEntryPct >= -0.5 && distanceToEntryPct <= 2.5 && trendScore >= 1 && rr >= 1.5) {
+        } else if (distanceToEntryPct >= -0.5 && distanceToEntryPct <= 2.5 && trendScore >= 1 && netRR >= 1.5) {
             action = { cls: 'bullish', title: '🟢 ACCUMULATE // 分批布局', reason: '價格接近建倉區，且均線 / Fibonacci 支撐結構尚可，可採分批觀察方式。' };
         } else if (distanceToEntryPct > 2.5) {
             action = { cls: 'neutral', title: '🟡 WATCH // 等待回測', reason: '現價仍高於建倉參考區，等待回測支撐後可獲得較好的風險報酬結構。' };
@@ -3045,7 +3174,14 @@
 
         // Volume 是最後的訊號確認層：可升級 / 降級 ACTION，但不改寫 Entry / TP 的價格位置。
         if (volumeInfo.available) {
-            if (nearLimitDown && supportBroken) {
+            const atOrNearTP1 = C >= profitLow * 0.985;
+            if (atOrNearTP1 && volRatio >= 1.5 && (bearishEngulfing || longUpperWick)) {
+                action = {
+                    cls: 'neutral',
+                    title: '🟠 AVOID CHASING // 壓力區反轉K',
+                    reason: `${volumeState.label} + ${bearishEngulfing ? '看跌吞噬' : '長上影'}出現在TP1附近，停利/不追價權重提高。`
+                };
+            } else if (nearLimitDown && supportBroken) {
                 action = {
                     cls: 'bearish',
                     title: '🔴 LIMIT-DOWN RISK // 跌停風控優先',
@@ -3117,7 +3253,7 @@
             entryLow, entryHigh, profitLow, profitHigh, stopLoss, stopLossHigh, warningLevel,
             tp2Low, tp2High,
             defenseSources, defenseState, defenseText,
-            rr, riskPct, rewardPct, strength, exitStrength,
+            rr, netRR, transactionCostInfo, riskPct, rewardPct, strength, exitStrength,
             supportSources: supportCluster.map(x => x[0]),
             resistanceSources: resistanceCluster.map(x => x[0]),
             tp2Sources: tp2Cluster.map(x => x[0]),
@@ -3205,11 +3341,12 @@
         stopNote.textContent = `${data.defenseState}｜警戒 $${formatNumber(data.warningLevel, 2)}｜${data.defenseText}｜結構失效依據：${data.defenseSources.join(' + ')}｜${breakdownSuffix}`;
 
         let rrLabel = '🔴 不利';
-        if (data.rr >= 2) rrLabel = '🟢 良好';
-        else if (data.rr >= 1.5) rrLabel = '🟡 尚可';
-        else if (data.rr >= 1) rrLabel = '🟠 偏低';
-        rrEl.textContent = `1 : ${formatNumber(data.rr, 2)}  ${rrLabel}`;
-        rrDetail.textContent = `以建倉區中位估算｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%`;
+        if (data.netRR >= 2) rrLabel = '🟢 良好';
+        else if (data.netRR >= 1.5) rrLabel = '🟡 尚可';
+        else if (data.netRR >= 1) rrLabel = '🟠 偏低';
+        rrEl.textContent = `NET 1 : ${formatNumber(data.netRR, 2)}  ${rrLabel}`;
+        const taxPctText = formatNumber((data.transactionCostInfo?.rrSellTaxRate || 0) * 100, 1);
+        rrDetail.textContent = `Gross 1:${formatNumber(data.rr, 2)}｜Net已扣買賣手續費+賣出稅${taxPctText}%｜${data.transactionCostInfo?.rrQtySource || ''} ${formatNumber(data.transactionCostInfo?.rrQty || 0, 0)}股｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%`;
 
         actionEl.textContent = data.action.title;
         actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
@@ -3217,9 +3354,14 @@
         const specialVolTag = data.volumeInfo?.nearLimitUp
             ? '｜🔴 接近漲停'
             : (data.volumeInfo?.nearLimitDown ? '｜🔴 接近跌停' : '');
-        const liquidityTag = data.volumeInfo?.lowLiquidity ? '｜⚠️ 低流動性(<500張/20日均量)' : '';
+        const liquidityTag = data.volumeInfo?.lowLiquidity
+            ? `｜⚠️ 低流動性(前20日均成交額 NT$${formatNumber((data.volumeInfo.avgTurnover20 || 0) / 1000000, 1)}M < 20M)`
+            : '';
+        const newListingTag = data.volumeInfo?.isFirstFiveTradingDays
+            ? '｜⚠️ 新股前5交易日：跳過一般±10%漲跌停特判'
+            : '';
         const volSummary = data.volumeInfo?.available
-            ? `${data.volumeInfo.state.label} VolRatio ${formatNumber(data.volumeInfo.volRatio, 2)}｜前5日均量 ${formatNumber(data.volumeInfo.volMA5, 0)} / 前20日均量 ${formatNumber(data.volumeInfo.volMA20, 0)} / 前60日均量 ${formatNumber(data.volumeInfo.volMA60, 0)}${specialVolTag}${liquidityTag}`
+            ? `${data.volumeInfo.state.label} VolRatio ${formatNumber(data.volumeInfo.volRatio, 2)}｜前5日均量 ${formatNumber(data.volumeInfo.volMA5, 0)} / 前20日均量 ${formatNumber(data.volumeInfo.volMA20, 0)} / 前60日均量 ${formatNumber(data.volumeInfo.volMA60, 0)}${specialVolTag}${liquidityTag}${newListingTag}`
             : '量能資料不足';
         const divergenceSummary = data.volumeInfo?.divergenceText ? `｜${data.volumeInfo.divergenceText}` : '';
         statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜${volSummary}${divergenceSummary}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜建議價已依台股跳動單位四捨五入`;
