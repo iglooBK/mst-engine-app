@@ -377,6 +377,19 @@
             }
         }
 
+        /* 📌 獨立庫存計算結果卡片：外觀呼應分析卡，但列印時保留 */
+        .position-summary-card {
+            background: #090c10;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 14px;
+            margin-bottom: 20px;
+        }
+
+        .position-summary-card .summary-card {
+            margin-bottom: 0;
+        }
+
         /* 總結數據卡片 */
         .summary-card {
             display: grid;
@@ -1657,31 +1670,6 @@
         </div>
     </div>
 
-    <div class="summary-card">
-        <div class="summary-item">
-            <label>TOTAL SHARES // 總股數</label>
-            <div class="value" id="totalQty">0</div>
-        </div>
-        <div class="summary-item">
-            <label>TOTAL CAPITAL // 總投入資金</label>
-            <div class="value" id="totalCost">$0</div>
-            <div class="summary-detail" id="buyFeeDetail">BUY FEE $0</div>
-        </div>
-        <div class="summary-item">
-            <label>AVG COST // 均價(含費)</label>
-            <div class="value avg-cost" id="avgPrice">$0.00</div>
-        </div>
-        <div class="summary-item">
-            <label>EST. PROCEEDS // 預估賣出淨額</label>
-            <div class="value" id="netSellVal">$0</div>
-            <div class="summary-detail" id="sellTaxDetail">FEE $0 | TAX $0</div>
-        </div>
-        <div class="summary-item highlight-box">
-            <label>NET P&L (ROI) // 預估實際淨損益 (淨報酬率)</label>
-            <div class="value neutral" id="totalPnL">$0 (0.00%)</div>
-        </div>
-    </div>
-
     <!-- 📰 BLOOMBERG LIVE NEWS FEED 區塊 -->
     <div class="news-card" id="newsCard">
         <div class="news-header-title">
@@ -1889,6 +1877,37 @@
         </div>
         <div id="extContent">
             <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">此區塊需額外抓取約一年份資料，點擊上方按鈕載入（載入需要幾秒鐘）</div>
+        </div>
+    </div>
+
+    <!-- 📌 庫存計算結果：移至延伸分析下方，方便在庫存明細前先查看整體結果 -->
+    <div class="position-summary-card" id="positionSummaryCard">
+        <div class="news-header-title">
+            <h3>📌 POSITION SUMMARY // 庫存計算結果</h3>
+        </div>
+        <div class="summary-card">
+            <div class="summary-item">
+                <label>TOTAL SHARES // 總股數</label>
+                <div class="value" id="totalQty">0</div>
+            </div>
+            <div class="summary-item">
+                <label>TOTAL CAPITAL // 總投入資金</label>
+                <div class="value" id="totalCost">$0</div>
+                <div class="summary-detail" id="buyFeeDetail">BUY FEE $0</div>
+            </div>
+            <div class="summary-item">
+                <label>AVG COST // 均價(含費)</label>
+                <div class="value avg-cost" id="avgPrice">$0.00</div>
+            </div>
+            <div class="summary-item">
+                <label>EST. PROCEEDS // 預估賣出淨額</label>
+                <div class="value" id="netSellVal">$0</div>
+                <div class="summary-detail" id="sellTaxDetail">FEE $0 | TAX $0</div>
+            </div>
+            <div class="summary-item highlight-box">
+                <label>NET P&L (ROI) // 預估實際淨損益 (淨報酬率)</label>
+                <div class="value neutral" id="totalPnL">$0 (0.00%)</div>
+            </div>
         </div>
     </div>
 
