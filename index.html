@@ -1514,6 +1514,66 @@
             font-size: 0.68rem;
             line-height: 1.5;
         }
+
+        /* v4.8.4 // Newbie-friendly NET R/R meter */
+        .ploutos-rr .rr-meter {
+            margin-top: 9px;
+        }
+        .ploutos-rr .rr-meter-track {
+            position: relative;
+            height: 9px;
+            border-radius: 999px;
+            background: linear-gradient(90deg,
+                #ff3b30 0%, #ff3b30 25%,
+                #f59e0b 25%, #f59e0b 50%,
+                #facc15 50%, #facc15 75%,
+                #22c55e 75%, #22c55e 100%);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+        }
+        .ploutos-rr .rr-meter-marker {
+            position: absolute;
+            top: 50%;
+            left: 0%;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #090c10;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 1px rgba(255,255,255,.45), 0 0 8px rgba(255,255,255,.3);
+            transition: left .25s ease;
+        }
+        .ploutos-rr .rr-meter-scale {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            margin-top: 5px;
+            gap: 3px;
+            color: var(--text-muted);
+            font-size: 0.56rem;
+            font-weight: 700;
+            line-height: 1.25;
+            text-align: center;
+        }
+        .ploutos-rr .rr-explain {
+            margin-top: 7px;
+            color: #cbd5e1;
+            font-size: 0.66rem;
+            line-height: 1.4;
+        }
+
+        .ploutos-do-dont {
+            grid-column: 1 / -1;
+            padding: 12px 14px;
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 10px;
+            background: rgba(255,255,255,.025);
+        }
+        .ploutos-do-dont .dd-title { margin-bottom:9px; color:#e5e7eb; font-size:.72rem; font-weight:800; }
+        .ploutos-do-dont .dd-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
+        .ploutos-do-dont .dd-item { font-size:.69rem; line-height:1.45; }
+        .ploutos-do-dont .dd-do { color:#86efac; }
+        .ploutos-do-dont .dd-dont { color:#fca5a5; }
+        @media (max-width:700px) { .ploutos-do-dont .dd-grid { grid-template-columns:1fr; gap:7px; } }
         .ploutos-disclaimer {
             margin-top: 9px;
             color: #64748b;
@@ -2075,7 +2135,7 @@
 
             <div class="ploutos-guide" id="ploutosGuide">
                 <div class="ploutos-guide-title">
-                    <strong>🧭 PLOUTOS ENTRY / EXIT ENGINE // 新手進出場決策參考</strong>
+                    <strong>🧭 PLOUTOS ENTRY / EXIT ENGINE // 智慧進出場決策引擎</strong>
                     <span class="ploutos-bias-pill neutral" id="ploutosBias">等待資料</span>
                 </div>
                 <div id="ploutosGuideStatus" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:9px;">將依均線、量能、交叉訊號、Fibonacci 與支撐/壓力自動評估</div>
@@ -2103,13 +2163,34 @@
                     <div class="ploutos-rr">
                         <div style="font-size:0.66rem; color:var(--text-label); font-weight:800; margin-bottom:5px;">RISK / REWARD // 風險報酬比</div>
                         <div class="rr-value" id="ploutosRR">--</div>
+                        <div class="rr-meter" id="ploutosRRMeter" aria-label="NET Risk Reward Meter">
+                            <div class="rr-meter-track">
+                                <span class="rr-meter-marker" id="ploutosRRMarker" style="left:0%;"></span>
+                            </div>
+                            <div class="rr-meter-scale">
+                                <span>🔴 不利<br>&lt;1.0</span>
+                                <span>🟠 偏低<br>1.0+</span>
+                                <span>🟡 尚可<br>1.5+</span>
+                                <span>🟢 良好<br>2.0+</span>
+                            </div>
+                        </div>
+                        <div class="rr-explain" id="ploutosRRExplain">等待風險報酬資料</div>
                         <div class="rr-detail" id="ploutosRRDetail">--</div>
                     </div>
                     <div class="ploutos-action">
                         <div style="font-size:0.66rem; color:var(--text-label); font-weight:800; margin-bottom:5px;">ACTION // 行動參考</div>
                         <strong id="ploutosAction">🟡 WAIT // 等待資料</strong>
                         <div class="action-reason" id="ploutosActionReason">完成技術資料擷取後自動產生。</div>
+                        <div class="ploutos-do-dont" id="ploutosDoDont">
+                        <div class="dd-title">DO / DON'T // 現在該做什麼</div>
+                        <div class="dd-grid">
+                            <div class="dd-item dd-do" id="ploutosDo1">✓ 可以：等待 PLOUTOS 產生決策訊號</div>
+                            <div class="dd-item dd-do" id="ploutosDo2">✓ 可以：先確認 Entry / Stop / R/R</div>
+                            <div class="dd-item dd-dont" id="ploutosDont1">✕ 不要：在資料不足時猜方向</div>
+                            <div class="dd-item dd-dont" id="ploutosDont2">✕ 不要：因單一指標衝動交易</div>
+                        </div>
                     </div>
+                </div>
                 </div>
                 <div class="ploutos-disclaimer">⚠ 本區為技術分析模型依歷史價格、成交量、均線、Fibonacci 與支撐/壓力推算之參考區間，不代表未來價格，也不是保證獲利或個人化投資建議。建議分批操作並自行評估風險承受能力。</div>
             </div>
@@ -4063,6 +4144,35 @@
         };
     }
 
+    function renderPloutosDoDont(action) {
+        const els = ['ploutosDo1','ploutosDo2','ploutosDont1','ploutosDont2'].map(id => document.getElementById(id));
+        if (els.some(el => !el)) return;
+        const title = String(action?.title || action || '').toUpperCase();
+        let items;
+        if (title.includes('FAVORABLE ENTRY')) items = [
+            '✓ 可以：分批掛進 Entry Zone','✓ 可以：等止跌 K 棒確認後再補','✕ 不要：一次滿倉','✕ 不要：超過 Entry Zone 追價'
+        ];
+        else if (title.includes('ACCUMULATE')) items = [
+            '✓ 可以：小部位試水溫、分批建立部位','✓ 可以：等支撐確認或量價轉強再加碼','✕ 不要：第一次進場就重押','✕ 不要：價格脫離 Entry Zone 後追高'
+        ];
+        else if (title.includes('RISK OFF') || title.includes('CONFIRMED BREAKDOWN')) items = [
+            '✓ 可以：等待重新站回短均線','✓ 可以：降低曝險並遵守 Stop Loss','✕ 不要：跌破支撐後攤平','✕ 不要：因為「跌很多了」就猜底'
+        ];
+        else if (title.includes('HOLD FOR TP2')) items = [
+            '✓ 可以：續抱並觀察 TP2 與壓力區','✓ 可以：依紀律分批停利、保護既有獲利','✕ 不要：因短線震盪隨意改變原策略','✕ 不要：接近壓力區仍盲目加碼'
+        ];
+        else if (title.includes('TAKE PROFIT') || title.includes('TP1')) items = [
+            '✓ 可以：依原計畫分批停利','✓ 可以：剩餘部位續看 TP2 / 壓力區','✕ 不要：到達目標後因貪心取消停利','✕ 不要：在壓力區突然大幅加碼'
+        ];
+        else if (title.includes('WATCH') || title.includes('WAIT')) items = [
+            '✓ 可以：等待價格進入 Entry Zone','✓ 可以：觀察止跌 K 棒與量價確認','✕ 不要：訊號未確認就急著進場','✕ 不要：因為怕錯過而追價'
+        ];
+        else items = [
+            '✓ 可以：先確認 Entry / Stop / NET R/R','✓ 可以：依 PLOUTOS 訊號分批執行','✕ 不要：一次滿倉','✕ 不要：忽略 Stop Loss 與風險報酬'
+        ];
+        els.forEach((el,i)=>el.textContent=items[i]);
+    }
+
     function renderPloutosGuide(data) {
         const biasEl = document.getElementById('ploutosBias');
         const statusEl = document.getElementById('ploutosGuideStatus');
@@ -4076,6 +4186,8 @@
         const stopNote = document.getElementById('ploutosStopNote');
         const rrEl = document.getElementById('ploutosRR');
         const rrDetail = document.getElementById('ploutosRRDetail');
+        const rrMarker = document.getElementById('ploutosRRMarker');
+        const rrExplain = document.getElementById('ploutosRRExplain');
         const actionEl = document.getElementById('ploutosAction');
         const actionReason = document.getElementById('ploutosActionReason');
         if (!biasEl) return;
@@ -4089,8 +4201,11 @@
             if (tp2Note) tp2Note.textContent = '暫無第二停利目標';
             entryNote.textContent = profitNote.textContent = stopNote.textContent = '--';
             rrEl.textContent = '--'; rrDetail.textContent = '--';
+            if (rrMarker) rrMarker.style.left = '0%';
+            if (rrExplain) rrExplain.textContent = '等待風險報酬資料';
             actionEl.textContent = '🟡 WAIT // 等待資料';
             actionReason.textContent = '完成技術資料擷取後自動產生。';
+            renderPloutosDoDont('WAIT');
             return;
         }
 
@@ -4104,8 +4219,11 @@
             if (tp2Note) tp2Note.textContent = '暫無第二停利目標';
             entryNote.textContent = profitNote.textContent = stopNote.textContent = '暫不提供價格區間';
             rrEl.textContent = '--'; rrDetail.textContent = '等待價格結構更清楚';
+            if (rrMarker) rrMarker.style.left = '0%';
+            if (rrExplain) rrExplain.textContent = '目前沒有足夠清楚的價格結構可評估風險報酬';
             actionEl.textContent = '🟡 WATCH // 等待確認';
             actionReason.textContent = data.reason;
+            renderPloutosDoDont('WATCH');
             return;
         }
 
@@ -4134,13 +4252,29 @@
         if (data.netRR >= 2) rrLabel = '🟢 良好';
         else if (data.netRR >= 1.5) rrLabel = '🟡 尚可';
         else if (data.netRR >= 1) rrLabel = '🟠 偏低';
+
         rrEl.textContent = `NET 1 : ${formatNumber(data.netRR, 2)}  ${rrLabel}`;
+
+        // Visual scale: 0~2.5+ mapped to 0~100%.
+        // Classification thresholds remain exactly: <1 / 1+ / 1.5+ / 2+.
+        if (rrMarker) {
+            const rrMeterMax = 2.5;
+            const rrPosition = Math.max(0, Math.min(100, (data.netRR / rrMeterMax) * 100));
+            rrMarker.style.left = `${rrPosition}%`;
+        }
+        if (rrExplain) {
+            rrExplain.textContent = Number.isFinite(data.netRR)
+                ? `每承擔 1 元風險，理論淨報酬空間約 ${formatNumber(data.netRR, 2)} 元｜${rrLabel.replace(/^[^ ]+\s*/, '')}`
+                : '等待風險報酬資料';
+        }
+
         const taxPctText = formatNumber((data.transactionCostInfo?.rrSellTaxRate || 0) * 100, 1);
         rrDetail.textContent = `Gross 1:${formatNumber(data.rr, 2)}｜Net已扣買賣手續費+賣出稅${taxPctText}%｜${data.transactionCostInfo?.rrQtySource || ''} ${formatNumber(data.transactionCostInfo?.rrQty || 0, 0)}股｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%`;
 
         actionEl.textContent = data.action.title;
         actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
         actionReason.textContent = data.action.reason;
+        renderPloutosDoDont(data.action);
         const specialVolTag = data.volumeInfo?.nearLimitUp
             ? '｜🔴 接近漲停'
             : (data.volumeInfo?.nearLimitDown ? '｜🔴 接近跌停' : '');
