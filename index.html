@@ -22,11 +22,7 @@
     <script src="stock-list.js"></script>
     <script src="fundamentals-data.js"></script>
     <script src="dividend-data.js"></script>
-    <script>
-        // MARKET PULSE 靜態資料庫：每次重新載入頁面都帶 cache-buster，
-        // 避免不同裝置偶爾讀到舊版 market-data.js。
-        document.write('<script src="market-data.js?v=' + Date.now() + '"><\\/script>');
-    </script>
+    <script src="market-data.js"></script>
     <style>
         :root {
             --bg-color: #0b0e14;
@@ -2790,7 +2786,7 @@
 
 
     /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE
-       v4.8.7：TAIEX 固定採靜態資料庫最後兩個有效交易日比較；週末 / 連假不影響。
+       v4.8.8：保留最後兩個有效交易日比較；恢復標準 script 載入，修正空白頁問題。
        不再計算 MA5/10/20/60 與 MARKET TREND。 */
     function mpNumber(value) {
         const n = Number(value);
