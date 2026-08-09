@@ -740,16 +740,16 @@
         .market-pulse-item label {
             display: block;
             color: var(--text-label);
-            font-size: .68rem;
+            font-size: .80rem;
             font-weight: 700;
             letter-spacing: .4px;
-            margin-bottom: 5px;
+            margin-bottom: 7px;
         }
 
         .market-pulse-item .value {
             color: #fff;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.15rem;
+            font-size: 1.55rem;
             font-weight: 800;
             line-height: 1.25;
             white-space: nowrap;
@@ -758,8 +758,8 @@
         .market-pulse-item .sub {
             margin-top: 4px;
             color: var(--text-muted);
-            font-size: .67rem;
-            font-weight: 600;
+            font-size: .78rem;
+            font-weight: 700;
             min-height: 1em;
         }
 
@@ -787,12 +787,15 @@
         .market-pulse-source {
             margin-top: 9px;
             color: var(--text-muted);
-            font-size: .64rem;
+            font-size: .70rem;
             line-height: 1.55;
         }
 
         @media (max-width: 760px) {
-            .market-pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .market-pulse-grid { grid-template-columns: 1fr; }
+            .market-pulse-item label { font-size: .76rem; }
+            .market-pulse-item .value { font-size: 1.40rem; }
+            .market-pulse-item .sub { font-size: .74rem; }
         }
 
         /* 📈 均線分析區塊樣式 */
@@ -1921,11 +1924,10 @@
                     <div class="value neutral" id="mpBasisValue">--</div>
                     <div class="sub neutral" id="mpBasisLabel">等待資料</div>
                 </div>
-
             </div>
 
             <div class="market-pulse-source" id="mpSourceText">
-                DATA SOURCE // market-data.js｜TWSE TAIEX + TAIFEX TX｜STATIC DATABASE
+                DATA SOURCE ｜TWSE TAIEX + TAIFEX TX
             </div>
         </div>
     </div>
@@ -2703,8 +2705,8 @@
 
 
     /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE
-       v4.8.3：只顯示 TAIEX / TX FRONT / BASIS。
-       TAIEX 使用最近兩個交易日計算漲跌，與 TX FRONT 採相同紅漲綠跌呈現。 */
+       v4.8.2：只顯示最新 TAIEX / TX / BASIS / 近月契約。
+       不再計算 MA5/10/20/60 與 MARKET TREND。 */
     function mpNumber(value) {
         const n = Number(value);
         return Number.isFinite(n) ? n : null;
@@ -2729,33 +2731,21 @@
         const sourceText = document.getElementById('mpSourceText');
 
         if (typeof MARKET_DATA === 'undefined') {
-            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6.3.py';
-            if (sourceText) sourceText.textContent = 'DATA SOURCE // market-data.js 尚未載入';
+            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6-simple.py';
+            if (sourceText) sourceText.textContent = 'DATA SOURCE ｜TWSE TAIEX + TAIFEX TX';
             return;
         }
 
         try {
-            const history = Array.isArray(MARKET_DATA?.taiex?.history)
-                ? MARKET_DATA.taiex.history
-                    .map(x => ({ date: String(x.date || ''), close: mpNumber(x.close) }))
-                    .filter(x => x.date && Number.isFinite(x.close))
-                : [];
-
-            const latest = history.at(-1) || MARKET_DATA?.taiex?.latest || null;
-            const prev = history.length >= 2 ? history.at(-2) : null;
+            const latest = MARKET_DATA?.taiex?.latest || MARKET_DATA?.taiex?.history?.at(-1) || null;
             const tx = MARKET_DATA?.tx || null;
 
             const taiexValueEl = document.getElementById('mpTaiexValue');
             const taiexChangeEl = document.getElementById('mpTaiexChange');
+
             const taiexClose = mpNumber(latest?.close);
-
-            let taiexChange = mpNumber(latest?.change);
-            let taiexChangePct = mpNumber(latest?.changePct);
-
-            if (!Number.isFinite(taiexChange) && prev && Number.isFinite(taiexClose)) {
-                taiexChange = taiexClose - prev.close;
-                taiexChangePct = prev.close ? (taiexChange / prev.close) * 100 : null;
-            }
+            const taiexChange = mpNumber(latest?.change);
+            const taiexChangePct = mpNumber(latest?.changePct);
 
             if (Number.isFinite(taiexClose)) {
                 taiexValueEl.textContent = mpFormat(taiexClose, 2);
@@ -2834,8 +2824,7 @@
             }
 
             if (sourceText) {
-                sourceText.textContent =
-                    'DATA SOURCE // market-data.js｜TWSE TAIEX + TAIFEX TX｜Python Builder v3.6.3';
+                sourceText.textContent = 'DATA SOURCE ｜TWSE TAIEX + TAIFEX TX';
             }
         } catch (error) {
             console.error('Static Market Pulse error:', error);
