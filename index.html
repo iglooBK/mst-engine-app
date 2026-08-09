@@ -2731,30 +2731,47 @@
         const sourceText = document.getElementById('mpSourceText');
 
         if (typeof MARKET_DATA === 'undefined') {
-            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6-simple.py';
+            if (status) status.textContent = '⚠️ 找不到 market-data.js｜請先執行 build-stock-list-3.6.3.py';
             if (sourceText) sourceText.textContent = 'DATA SOURCE ｜TWSE TAIEX + TAIFEX TX';
             return;
         }
 
         try {
-            const latest = MARKET_DATA?.taiex?.latest || MARKET_DATA?.taiex?.history?.at(-1) || null;
+            const taiexHistory = Array.isArray(MARKET_DATA?.taiex?.history)
+                ? MARKET_DATA.taiex.history
+                    .map(x => ({ date: String(x?.date || ''), close: mpNumber(x?.close) }))
+                    .filter(x => x.date && Number.isFinite(x.close))
+                : [];
+
+            const latest = taiexHistory.at(-1) || MARKET_DATA?.taiex?.latest || null;
+            const previous = taiexHistory.length >= 2 ? taiexHistory.at(-2) : null;
             const tx = MARKET_DATA?.tx || null;
 
             const taiexValueEl = document.getElementById('mpTaiexValue');
             const taiexChangeEl = document.getElementById('mpTaiexChange');
 
             const taiexClose = mpNumber(latest?.close);
-            const taiexChange = mpNumber(latest?.change);
-            const taiexChangePct = mpNumber(latest?.changePct);
+            let taiexChange = mpNumber(latest?.change);
+            let taiexChangePct = mpNumber(latest?.changePct);
+
+            // TAIEX 與 TX FRONT 使用相同邏輯：
+            // 最新交易日 vs 前一交易日，漲=紅、跌=綠。
+            if (!Number.isFinite(taiexChange) && previous && Number.isFinite(taiexClose)) {
+                taiexChange = taiexClose - previous.close;
+                taiexChangePct = previous.close !== 0
+                    ? (taiexChange / previous.close) * 100
+                    : null;
+            }
 
             if (Number.isFinite(taiexClose)) {
                 taiexValueEl.textContent = mpFormat(taiexClose, 2);
+
                 if (Number.isFinite(taiexChange)) {
                     taiexChangeEl.textContent =
                         `${taiexChange >= 0 ? '+' : ''}${mpFormat(taiexChange, 2)}${Number.isFinite(taiexChangePct) ? ` (${taiexChangePct >= 0 ? '+' : ''}${mpFormat(taiexChangePct, 2)}%)` : ''}`;
                     mpSetDirection(taiexValueEl, taiexChangeEl, taiexChange);
                 } else {
-                    taiexChangeEl.textContent = `資料日 ${latest?.date || '--'}`;
+                    taiexChangeEl.textContent = `需最近 2 個交易日資料`;
                     mpSetDirection(taiexValueEl, taiexChangeEl, 0);
                 }
             } else {
