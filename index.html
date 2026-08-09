@@ -1793,7 +1793,7 @@
                 </div>
                 <button type="button" class="btn-refresh-all" id="refreshAllDataBtn" onclick="refreshAllData()">⚡ 更新所有數據</button>
             </div>
-            <div class="stock-search-hint">輸入代號或部分名稱後按 Tab 搜尋，例如「2330」、「台積」、「元大」</div>
+            <div class="stock-search-hint">電腦版：輸入後按 Tab 搜尋｜手機 / iPad：輸入後按空白鍵搜尋</div>
             <div id="portfolioStockMeta" class="stock-meta-line" aria-live="polite"></div>
         </div>
     </div>
@@ -4736,16 +4736,40 @@
         stockNameFillTimer = setTimeout(autoFillStockName, 500);
     }
 
+    function isPloutosMobileDevice() {
+        const ua = navigator.userAgent || '';
+        const touchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+        const mobileUA = /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+        const iPadDesktopMode = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        return mobileUA || iPadDesktopMode || (touchDevice && window.matchMedia('(pointer: coarse)').matches);
+    }
+
     function handlePortfolioSearchKeydown(event) {
         const input = document.getElementById('portfolioName');
         const dropdown = document.getElementById('stockSearchDropdown');
         const isOpen = dropdown && dropdown.classList.contains('show');
 
-        if (event.key === 'Tab') {
+        // 手機 / iPad：空白鍵作為搜尋觸發鍵，不把空白字元寫入欄位。
+        if ((event.key === ' ' || event.code === 'Space') && isPloutosMobileDevice()) {
             const query = input ? input.value.trim() : '';
 
             if (query) {
-                // 第一次 Tab：開啟模糊搜尋並保留焦點在輸入框。
+                event.preventDefault();
+                renderStockSearchDropdown(query);
+
+                if (stockSearchResults.length) {
+                    stockSearchActiveIndex = 0;
+                    updateStockSearchActiveItem();
+                }
+            }
+            return;
+        }
+
+        // 電腦版：維持 Tab 觸發搜尋。
+        if (event.key === 'Tab' && !isPloutosMobileDevice()) {
+            const query = input ? input.value.trim() : '';
+
+            if (query) {
                 event.preventDefault();
                 renderStockSearchDropdown(query);
 
