@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v4.2-public | Frontend only | Yuanta credentials remain local -->
+<!-- PLOUTOS GitHub Release: v4.3-public-SXFPMI6 | Frontend only | Yuanta credentials remain local | 3-sec live refresh -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -822,7 +822,7 @@
 
         .market-region.us-region .market-region-grid {
             grid-template-columns: 1fr;
-            grid-template-rows: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(2, minmax(0, 1fr));
         }
 
         .market-region .market-pulse-item {
@@ -961,7 +961,7 @@
 
         @media (max-width: 900px) {
             .market-pulse-regions { grid-template-columns: 1fr; }
-            .market-region.us-region .market-region-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .market-region.us-region .market-region-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 760px) {
@@ -2321,7 +2321,7 @@
                 <section class="market-region us-region" aria-label="US Market">
                     <div class="market-region-title">
                         <span><b class="region-code">US</b> U.S. MARKET // 美國市場</span>
-                        <span class="region-live-hint">NASDAQ・SOX・CME</span>
+                        <span class="region-live-hint">NQ FUT・SEMI FUT</span>
                     </div>
                     <div class="market-region-grid">
                         <div class="market-pulse-item market-us" data-market-group="US">
@@ -2331,22 +2331,16 @@
                         </div>
 
                         <div class="market-pulse-item market-us" data-market-group="US">
-                            <label>NASDAQ COMP // 那斯達克指數</label>
-                            <div class="value neutral" id="mpNasdaqCompValue">--</div>
-                            <div class="sub neutral" id="mpNasdaqCompChange">等待元大 LIVE</div>
-                        </div>
-
-                        <div class="market-pulse-item market-us" data-market-group="US">
-                            <label>SOX // 費半指數</label>
-                            <div class="value neutral" id="mpSoxValue">--</div>
-                            <div class="sub neutral" id="mpSoxChange">等待元大 LIVE</div>
+                            <label>SEMICONDUCTOR FUT // 美國費半期貨</label>
+                            <div class="value neutral" id="mpSemiFutValue">--</div>
+                            <div class="sub neutral" id="mpSemiFutChange">等待元大 LIVE</div>
                         </div>
                     </div>
                 </section>
             </div>
 
             <div class="market-pulse-source" id="mpSourceText">
-                DATA SOURCE ｜YUANTA SPARK API PROD // TWSE・TAIFEX・U.S. MARKET // QUOTE-ONLY // LOCAL BRIDGE
+                DATA SOURCE ｜YUANTA SPARK API PROD // TWSE・TAIFEX・CME // NQ_2609・SXFPMI6 // QUOTE-ONLY // LOCAL BRIDGE
             </div>
         </div>
     </div>
@@ -3281,7 +3275,7 @@
         if (ploutosStockLiveTimer) clearInterval(ploutosStockLiveTimer);
         ploutosStockLiveTimer = setInterval(() => {
             ploutosRefreshSelectedStockLiveFromCache().catch(() => {});
-        }, 5000);
+        }, 3000);
     }
 
     /* 📈 主流程：抓取股價並更新均線落點顯示 */
@@ -3613,8 +3607,7 @@
         const tx = mpPick(raw, ['tx','TX','tx_front','txFront','futures','market.tx','data.tx','TXF1']);
         const txAll = mpPick(raw, ['txAll','tx_all','TXALL','market.txAll','data.txAll','TXFF']);
         const nasdaqFut = mpPick(raw, ['nasdaqFut','nasdaq_fut','market.nasdaqFut','data.nasdaqFut']);
-        const nasdaqComp = mpPick(raw, ['nasdaqComp','nasdaq_comp','COMP','market.nasdaqComp','data.nasdaqComp']);
-        const sox = mpPick(raw, ['sox','SOX','market.sox','data.sox']);
+        const semiFut = mpPick(raw, ['semiFut','semi_fut','SXFPMI6','market.semiFut','data.semiFut']);
         const updatedRaw = mpPick(raw, ['updatedAt','updated_at','timestamp','time','generatedAt','meta.updatedAt']);
         const updatedMs = updatedRaw ? Date.parse(updatedRaw) : NaN;
 
@@ -3630,8 +3623,7 @@
         const xObj = (tx && typeof tx === 'object') ? tx : {};
         const xaObj = (txAll && typeof txAll === 'object') ? txAll : {};
         const nfObj = (nasdaqFut && typeof nasdaqFut === 'object') ? nasdaqFut : {};
-        const ncObj = (nasdaqComp && typeof nasdaqComp === 'object') ? nasdaqComp : {};
-        const soxObj = (sox && typeof sox === 'object') ? sox : {};
+        const sfObj = (semiFut && typeof semiFut === 'object') ? semiFut : {};
 
         const taiexDeal = num(tObj.deal, tObj.close, tObj.price, tObj.last, mpPick(raw,['taiex_deal','taiexDeal']));
         const taiexYst = num(tObj.yst, tObj.yesterday, tObj.prevClose, tObj.previousClose, mpPick(raw,['taiex_yst','taiexYst']));
@@ -3641,36 +3633,32 @@
         const txAllYst = num(xaObj.yst, xaObj.yesterday, xaObj.prevClose, xaObj.previousClose, mpPick(raw,['tx_all_yst','txAllYst']));
         const nasdaqFutDeal = num(nfObj.deal, nfObj.close, nfObj.price, nfObj.last);
         const nasdaqFutYst = num(nfObj.yst, nfObj.yesterday, nfObj.prevClose, nfObj.previousClose);
-        const nasdaqCompDeal = num(ncObj.deal, ncObj.close, ncObj.price, ncObj.last);
-        const nasdaqCompYst = num(ncObj.yst, ncObj.yesterday, ncObj.prevClose, ncObj.previousClose);
-        const soxDeal = num(soxObj.deal, soxObj.close, soxObj.price, soxObj.last);
-        const soxYst = num(soxObj.yst, soxObj.yesterday, soxObj.prevClose, soxObj.previousClose);
+        const semiFutDeal = num(sfObj.deal, sfObj.close, sfObj.price, sfObj.last);
+        const semiFutYst = num(sfObj.yst, sfObj.yesterday, sfObj.prevClose, sfObj.previousClose);
 
         let taiexChange = num(tObj.change, mpPick(raw,['taiex_change','taiexChange']));
         let txChange = num(xObj.change, mpPick(raw,['tx_change','txChange']));
         let txAllChange = num(xaObj.change, mpPick(raw,['tx_all_change','txAllChange']));
         let nasdaqFutChange = num(nfObj.change);
-        let nasdaqCompChange = num(ncObj.change);
-        let soxChange = num(soxObj.change);
+        let semiFutChange = num(sfObj.change);
+
         if (!Number.isFinite(taiexChange) && Number.isFinite(taiexDeal) && Number.isFinite(taiexYst)) taiexChange = taiexDeal - taiexYst;
         if (!Number.isFinite(txChange) && Number.isFinite(txDeal) && Number.isFinite(txYst)) txChange = txDeal - txYst;
         if (!Number.isFinite(txAllChange) && Number.isFinite(txAllDeal) && Number.isFinite(txAllYst)) txAllChange = txAllDeal - txAllYst;
         if (!Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutDeal) && Number.isFinite(nasdaqFutYst)) nasdaqFutChange = nasdaqFutDeal - nasdaqFutYst;
-        if (!Number.isFinite(nasdaqCompChange) && Number.isFinite(nasdaqCompDeal) && Number.isFinite(nasdaqCompYst)) nasdaqCompChange = nasdaqCompDeal - nasdaqCompYst;
-        if (!Number.isFinite(soxChange) && Number.isFinite(soxDeal) && Number.isFinite(soxYst)) soxChange = soxDeal - soxYst;
+        if (!Number.isFinite(semiFutChange) && Number.isFinite(semiFutDeal) && Number.isFinite(semiFutYst)) semiFutChange = semiFutDeal - semiFutYst;
 
         let taiexPct = num(tObj.changePct, tObj.change_pct, mpPick(raw,['taiex_change_pct','taiexChangePct']));
         let txPct = num(xObj.changePct, xObj.change_pct, mpPick(raw,['tx_change_pct','txChangePct']));
         let txAllPct = num(xaObj.changePct, xaObj.change_pct, mpPick(raw,['tx_all_change_pct','txAllChangePct']));
         let nasdaqFutPct = num(nfObj.changePct, nfObj.change_pct);
-        let nasdaqCompPct = num(ncObj.changePct, ncObj.change_pct);
-        let soxPct = num(soxObj.changePct, soxObj.change_pct);
+        let semiFutPct = num(sfObj.changePct, sfObj.change_pct);
+
         if (!Number.isFinite(taiexPct) && Number.isFinite(taiexChange) && Number.isFinite(taiexYst) && taiexYst) taiexPct = taiexChange / taiexYst * 100;
         if (!Number.isFinite(txPct) && Number.isFinite(txChange) && Number.isFinite(txYst) && txYst) txPct = txChange / txYst * 100;
         if (!Number.isFinite(txAllPct) && Number.isFinite(txAllChange) && Number.isFinite(txAllYst) && txAllYst) txAllPct = txAllChange / txAllYst * 100;
         if (!Number.isFinite(nasdaqFutPct) && Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutYst) && nasdaqFutYst) nasdaqFutPct = nasdaqFutChange / nasdaqFutYst * 100;
-        if (!Number.isFinite(nasdaqCompPct) && Number.isFinite(nasdaqCompChange) && Number.isFinite(nasdaqCompYst) && nasdaqCompYst) nasdaqCompPct = nasdaqCompChange / nasdaqCompYst * 100;
-        if (!Number.isFinite(soxPct) && Number.isFinite(soxChange) && Number.isFinite(soxYst) && soxYst) soxPct = soxChange / soxYst * 100;
+        if (!Number.isFinite(semiFutPct) && Number.isFinite(semiFutChange) && Number.isFinite(semiFutYst) && semiFutYst) semiFutPct = semiFutChange / semiFutYst * 100;
 
         let basis = num(
             (raw && raw.basis && typeof raw.basis === 'object') ? raw.basis.value : raw?.basis,
@@ -3683,8 +3671,7 @@
             txDeal, txChange, txPct,
             txAllDeal, txAllChange, txAllPct,
             nasdaqFutDeal, nasdaqFutChange, nasdaqFutPct,
-            nasdaqCompDeal, nasdaqCompChange, nasdaqCompPct,
-            soxDeal, soxChange, soxPct,
+            semiFutDeal, semiFutChange, semiFutPct,
             basis, updatedRaw, updatedMs
         };
     }
@@ -3695,8 +3682,7 @@
         const yxv = document.getElementById('mpYuantaTxAllValue');
         const yxc = document.getElementById('mpYuantaTxAllChange');
         const nfv = document.getElementById('mpNasdaqFutValue'), nfc = document.getElementById('mpNasdaqFutChange');
-        const ncv = document.getElementById('mpNasdaqCompValue'), ncc = document.getElementById('mpNasdaqCompChange');
-        const sv = document.getElementById('mpSoxValue'), sc = document.getElementById('mpSoxChange');
+        const sfv = document.getElementById('mpSemiFutValue'), sfc = document.getElementById('mpSemiFutChange');
         const tv = document.getElementById('mpTaiexValue');
         const tc = document.getElementById('mpTaiexChange');
         const xv = document.getElementById('mpTxValue');
@@ -3707,10 +3693,8 @@
 
         if (nfv) nfv.textContent = mpFormat(d.nasdaqFutDeal,2);
         if (nfc) nfc.textContent = Number.isFinite(d.nasdaqFutChange) ? `${d.nasdaqFutChange>=0?'+':''}${mpFormat(d.nasdaqFutChange,2)} (${d.nasdaqFutPct>=0?'+':''}${mpFormat(d.nasdaqFutPct,2)}%)` : mode;
-        if (ncv) ncv.textContent = mpFormat(d.nasdaqCompDeal,2);
-        if (ncc) ncc.textContent = Number.isFinite(d.nasdaqCompChange) ? `${d.nasdaqCompChange>=0?'+':''}${mpFormat(d.nasdaqCompChange,2)} (${d.nasdaqCompPct>=0?'+':''}${mpFormat(d.nasdaqCompPct,2)}%)` : mode;
-        if (sv) sv.textContent = mpFormat(d.soxDeal,2);
-        if (sc) sc.textContent = Number.isFinite(d.soxChange) ? `${d.soxChange>=0?'+':''}${mpFormat(d.soxChange,2)} (${d.soxPct>=0?'+':''}${mpFormat(d.soxPct,2)}%)` : mode;
+        if (sfv) sfv.textContent = mpFormat(d.semiFutDeal,2);
+        if (sfc) sfc.textContent = Number.isFinite(d.semiFutChange) ? `${d.semiFutChange>=0?'+':''}${mpFormat(d.semiFutChange,2)} (${d.semiFutPct>=0?'+':''}${mpFormat(d.semiFutPct,2)}%)` : mode;
         tv.textContent = mpFormat(d.taiexDeal, 2);
         tc.textContent = Number.isFinite(d.taiexChange)
             ? `${d.taiexChange >= 0 ? '+' : ''}${mpFormat(d.taiexChange, 2)}${Number.isFinite(d.taiexPct) ? ` (${d.taiexPct >= 0 ? '+' : ''}${mpFormat(d.taiexPct, 2)}%)` : ''}`
@@ -3734,14 +3718,12 @@
         mpSetDirection(xv, xc, d.txChange || 0);
         if (yxv && yxc) mpSetDirection(yxv, yxc, d.txAllChange || 0);
         if (nfv && nfc) mpSetDirection(nfv,nfc,d.nasdaqFutChange||0);
-        if (ncv && ncc) mpSetDirection(ncv,ncc,d.nasdaqCompChange||0);
-        if (sv && sc) mpSetDirection(sv,sc,d.soxChange||0);
+        if (sfv && sfc) mpSetDirection(sfv,sfc,d.semiFutChange||0);
 
-        // Flash only when the actual deal price changed versus the previous 5-second poll.
+        // Flash only when the actual deal price changed versus the previous 3-second poll.
         ploutosFlashMarketCard(yxv, 'txAll', d.txAllDeal);
         ploutosFlashMarketCard(nfv, 'nasdaqFut', d.nasdaqFutDeal);
-        ploutosFlashMarketCard(ncv, 'nasdaqComp', d.nasdaqCompDeal);
-        ploutosFlashMarketCard(sv, 'sox', d.soxDeal);
+        ploutosFlashMarketCard(sfv, 'semiFut', d.semiFutDeal);
         ploutosFlashMarketCard(tv, 'taiex', d.taiexDeal);
         ploutosFlashMarketCard(xv, 'txFront', d.txDeal);
 
@@ -3766,8 +3748,8 @@
         const stamp = d.updatedRaw || new Date().toLocaleTimeString('zh-TW', {hour12:false});
 
         if (mode === 'LIVE') {
-            if (status) status.textContent = `🟢 YUANTA LIVE｜${stamp}｜5 秒自動刷新`;
-            if (src) src.textContent = `DATA SOURCE ｜YUANTA SPARK API PROD // QUOTE-ONLY // ${sourceUrl.includes('127.0.0.1') ? 'LOCAL BRIDGE' : 'LOCAL JSON'}`;
+            if (status) status.textContent = `🟢 YUANTA LIVE｜${stamp}｜3 秒自動刷新`;
+            if (src) src.textContent = `DATA SOURCE ｜YUANTA SPARK API PROD // NQ_2609 + SXFPMI6 // QUOTE-ONLY // ${sourceUrl.includes('127.0.0.1') ? 'LOCAL BRIDGE' : 'LOCAL JSON'}`;
         } else {
             if (status) status.textContent = `🟠 YUANTA STALE｜最後行情 ${stamp}｜STATIC DB 未載入`;
             if (src) src.textContent = 'DATA SOURCE ｜LAST YUANTA QUOTE // LOCAL ONLY // STALE';
@@ -3856,7 +3838,7 @@
     function startMarketPulseAutoRefresh() {
         if (ploutosMarketPulseTimer) clearInterval(ploutosMarketPulseTimer);
         refreshMarketPulse();
-        ploutosMarketPulseTimer = setInterval(refreshMarketPulse, 5000);
+        ploutosMarketPulseTimer = setInterval(refreshMarketPulse, 3000);
     }
 
     function refreshMovingAverages() {
