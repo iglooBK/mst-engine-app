@@ -1,3 +1,4 @@
+<!-- PLOUTOS GitHub Release: v4.2-public | Frontend only | Yuanta credentials remain local -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -261,7 +262,7 @@
         /* 控制區塊：桌面固定三欄，讓 MKT PRICE / COMMISSION / MIN FEE 永遠等寬對齊 */
         .config-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px 14px;
             background: #090c10;
             border: 1px solid var(--card-border);
@@ -721,12 +722,133 @@
 
 
         /* 🇹🇼 MARKET PULSE // 台股大盤 */
-        .market-pulse-grid {
+        .market-pulse-regions {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 10px;
+            grid-template-columns: minmax(0, 1.06fr) minmax(0, .94fr);
+            gap: 12px;
+            margin-top: 12px;
+            align-items: stretch;
         }
+
+        /* v4.2: flatter trading-terminal grouping; no heavy box-inside-box look */
+        .market-region {
+            position: relative;
+            min-width: 0;
+            padding: 12px 12px 13px;
+            background: linear-gradient(180deg, rgba(13,20,32,.82), rgba(8,13,22,.48));
+            border: 1px solid rgba(77,96,126,.34);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .market-region::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 2px;
+            opacity: .9;
+        }
+
+        .market-region.tw-region::before {
+            background: linear-gradient(90deg, #f59e0b 0%, rgba(245,158,11,.16) 62%, transparent 100%);
+        }
+
+        .market-region.us-region::before {
+            background: linear-gradient(90deg, #22d3ee 0%, rgba(34,211,238,.14) 62%, transparent 100%);
+        }
+
+        .market-region.tw-region,
+        .market-region.us-region {
+            box-shadow: 0 10px 28px rgba(0,0,0,.12);
+        }
+
+        .market-region-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-height: 27px;
+            padding: 0 2px 10px;
+            margin-bottom: 9px;
+            border-bottom: 1px solid rgba(118,140,174,.16);
+            font-size: .75rem;
+            font-weight: 800;
+            letter-spacing: .72px;
+            color: #b8c9df;
+        }
+
+        .tw-region .market-region-title > span:first-child { color: #f6b73c; }
+        .us-region .market-region-title > span:first-child { color: #63d9ee; }
+
+        .market-region-title .region-code {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 27px;
+            height: 18px;
+            margin-right: 6px;
+            padding: 0 5px;
+            border-radius: 4px;
+            font-size: .58rem;
+            line-height: 1;
+            letter-spacing: .7px;
+            vertical-align: 1px;
+            background: rgba(255,255,255,.045);
+            border: 1px solid currentColor;
+            opacity: .88;
+        }
+
+        .market-region-title .region-live-hint {
+            padding: 3px 7px;
+            border: 1px solid rgba(116,137,169,.22);
+            border-radius: 999px;
+            background: rgba(5,10,18,.42);
+            font-size: .59rem;
+            font-weight: 650;
+            color: #7388a4;
+            letter-spacing: .35px;
+        }
+
+        .market-region-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .market-region.us-region .market-region-grid {
+            grid-template-columns: 1fr;
+            grid-template-rows: repeat(3, minmax(0, 1fr));
+        }
+
+        .market-region .market-pulse-item {
+            min-height: 102px;
+            height: 100%;
+            border-radius: 7px;
+            border: 1px solid rgba(71,91,122,.42);
+            background: rgba(13,20,32,.72);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .market-region .market-pulse-item:hover {
+            border-color: rgba(112,137,174,.55);
+            background: rgba(16,24,39,.86);
+        }
+
+        .market-region .market-pulse-item.market-tw,
+        .market-region .market-pulse-item.market-us {
+            border-top-color: rgba(71,91,122,.42);
+        }
+
+        .tw-region .market-pulse-item .value { text-shadow: 0 0 18px rgba(255,59,48,.08); }
+        .us-region .market-pulse-item .value { text-shadow: 0 0 18px rgba(34,211,238,.06); }
 
         .market-pulse-item {
             background: #0d131f;
@@ -736,6 +858,52 @@
             text-align: center;
             min-width: 0;
         }
+
+        /* ⚡ LIVE quote change flash: only cards whose deal price actually changed flash. */
+        .market-pulse-item {
+            transition: background .22s ease, border-color .22s ease, box-shadow .22s ease, transform .18s ease;
+        }
+
+        .market-pulse-item.quote-flash-up {
+            animation: ploutosQuoteFlashUp .68s ease-out;
+        }
+
+        .market-pulse-item.quote-flash-down {
+            animation: ploutosQuoteFlashDown .68s ease-out;
+        }
+
+        .market-pulse-item.quote-flash-flat {
+            animation: ploutosQuoteFlashFlat .55s ease-out;
+        }
+
+        @keyframes ploutosQuoteFlashUp {
+            0%   { background: rgba(255,59,48,.24); border-color: rgba(255,92,82,.95); box-shadow: 0 0 0 rgba(255,59,48,0); transform: scale(1); }
+            28%  { background: rgba(255,59,48,.14); box-shadow: 0 0 22px rgba(255,59,48,.28); transform: scale(1.008); }
+            100% { background: #0d131f; border-color: var(--card-border); box-shadow: none; transform: scale(1); }
+        }
+
+        @keyframes ploutosQuoteFlashDown {
+            0%   { background: rgba(52,199,89,.22); border-color: rgba(72,220,108,.92); box-shadow: 0 0 0 rgba(52,199,89,0); transform: scale(1); }
+            28%  { background: rgba(52,199,89,.13); box-shadow: 0 0 22px rgba(52,199,89,.25); transform: scale(1.008); }
+            100% { background: #0d131f; border-color: var(--card-border); box-shadow: none; transform: scale(1); }
+        }
+
+        @keyframes ploutosQuoteFlashFlat {
+            0%   { background: rgba(6,182,212,.18); border-color: rgba(6,182,212,.85); }
+            100% { background: #0d131f; border-color: var(--card-border); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .market-pulse-item.quote-flash-up,
+            .market-pulse-item.quote-flash-down,
+            .market-pulse-item.quote-flash-flat {
+                animation-duration: .01ms !important;
+            }
+        }
+
+        .market-pulse-item.market-tw { border-top-color: rgba(245,158,11,.45); }
+        .market-pulse-item.market-us { border-top-color: rgba(6,182,212,.55); }
+
 
         .market-pulse-item label {
             display: block;
@@ -773,13 +941,13 @@
         .market-pulse-item .sub.neutral { color: var(--text-muted); }
 
         .market-pulse-basis.positive {
-            border-color: rgba(255,59,48,.55);
-            box-shadow: inset 0 0 12px rgba(255,59,48,.06);
+            border-color: rgba(71,91,122,.42);
+            box-shadow: inset 0 0 14px rgba(255,59,48,.035);
         }
 
         .market-pulse-basis.negative {
-            border-color: rgba(52,199,89,.55);
-            box-shadow: inset 0 0 12px rgba(52,199,89,.06);
+            border-color: rgba(71,91,122,.42);
+            box-shadow: inset 0 0 14px rgba(52,199,89,.035);
         }
 
 
@@ -791,8 +959,19 @@
             line-height: 1.55;
         }
 
+        @media (max-width: 900px) {
+            .market-pulse-regions { grid-template-columns: 1fr; }
+            .market-region.us-region .market-region-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
         @media (max-width: 760px) {
-            .market-pulse-grid { grid-template-columns: 1fr; }
+            .market-pulse-regions { grid-template-columns: 1fr; }
+            .market-region-grid,
+            .market-region.us-region .market-region-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            .market-region .market-pulse-item { height: auto; }
             .market-pulse-item label { font-size: .76rem; }
             .market-pulse-item .value { font-size: 1.40rem; }
             .market-pulse-item .sub { font-size: .74rem; }
@@ -1607,6 +1786,16 @@
             background: #0a101a;
         }
 
+        #srCard .current-price-inline {
+            display: inline-block;
+            margin: 0 2px;
+            font-size: 0.92rem;
+            font-weight: 900;
+        }
+        #srCard .current-price-inline.up { color: var(--profit-color); }
+        #srCard .current-price-inline.down { color: var(--loss-color); }
+        #srCard .current-price-inline.neutral { color: var(--text-main); }
+
         /* ============================================================
            PLOUTOS v4.8.9 // DESKTOP READABILITY
            Only enlarges SUPPORT / RESISTANCE + ENTRY / EXIT typography.
@@ -1621,6 +1810,23 @@
             #srCard #srStatusText {
                 font-size: 0.86rem !important;
                 line-height: 1.55 !important;
+            }
+            #srCard .current-price-inline {
+                display: inline-block;
+                margin: 0 2px;
+                font-size: 1.04rem !important;
+                line-height: 1.2 !important;
+                font-weight: 900 !important;
+                letter-spacing: 0.2px;
+            }
+            #srCard .current-price-inline.up {
+                color: var(--profit-color) !important;
+            }
+            #srCard .current-price-inline.down {
+                color: var(--loss-color) !important;
+            }
+            #srCard .current-price-inline.neutral {
+                color: var(--text-main) !important;
             }
             #srCard .info-item {
                 padding: 14px 12px !important;
@@ -2068,7 +2274,7 @@
     <!-- 🇹🇼 MARKET PULSE：TAIEX / TX / BASIS -->
     <div class="news-card" id="marketPulseCard">
         <div class="news-header-title">
-            <h3>🇹🇼 MARKET PULSE // 台股大盤・加權指數・台指期</h3>
+            <h3>🌐 MARKET PULSE // 台美市場・指數・期貨</h3>
             <div style="display:flex; gap:6px; align-items:center;">
                 <button class="btn btn-secondary" style="font-size:0.7rem; padding:2px 6px;" onclick="refreshMarketPulse()">🔄 重新整理</button>
                 <button class="btn-collapse-toggle" id="marketPulseCollapseBtn" onclick="toggleCardCollapse('marketPulseCard','marketPulseCollapseBtn')">▲ 收合</button>
@@ -2079,28 +2285,68 @@
                 尚未載入靜態大盤資料庫
             </div>
 
-            <div class="market-pulse-grid">
-                <div class="market-pulse-item">
-                    <label>TAIEX // 加權指數</label>
-                    <div class="value neutral" id="mpTaiexValue">--</div>
-                    <div class="sub neutral" id="mpTaiexChange">--</div>
-                </div>
+            <div class="market-pulse-regions">
+                <section class="market-region tw-region" aria-label="Taiwan Market">
+                    <div class="market-region-title">
+                        <span><b class="region-code">TW</b> TAIWAN MARKET // 台灣市場</span>
+                        <span class="region-live-hint">TAIEX・TAIFEX</span>
+                    </div>
+                    <div class="market-region-grid">
+                        <div class="market-pulse-item market-tw" data-market-group="TW">
+                            <label>TAIEX // 加權指數</label>
+                            <div class="value neutral" id="mpTaiexValue">--</div>
+                            <div class="sub neutral" id="mpTaiexChange">--</div>
+                        </div>
 
-                <div class="market-pulse-item">
-                    <label>TX FRONT // 台指期近月</label>
-                    <div class="value neutral" id="mpTxValue">--</div>
-                    <div class="sub neutral" id="mpTxChange">--</div>
-                </div>
+                        <div class="market-pulse-item market-tw" data-market-group="TW">
+                            <label>TX ALL // 台指近全</label>
+                            <div class="value neutral" id="mpYuantaTxAllValue">--</div>
+                            <div class="sub neutral" id="mpYuantaTxAllChange">等待元大 LIVE</div>
+                        </div>
 
-                <div class="market-pulse-item market-pulse-basis" id="mpBasisBox">
-                    <label>BASIS // 期現貨價差</label>
-                    <div class="value neutral" id="mpBasisValue">--</div>
-                    <div class="sub neutral" id="mpBasisLabel">等待資料</div>
-                </div>
+                        <div class="market-pulse-item market-tw" data-market-group="TW">
+                            <label>TX FRONT // 台指期近月</label>
+                            <div class="value neutral" id="mpTxValue">--</div>
+                            <div class="sub neutral" id="mpTxChange">--</div>
+                        </div>
+
+                        <div class="market-pulse-item market-pulse-basis market-tw" data-market-group="TW" id="mpBasisBox">
+                            <label>BASIS // 期現貨價差</label>
+                            <div class="value neutral" id="mpBasisValue">--</div>
+                            <div class="sub neutral" id="mpBasisLabel">等待資料</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="market-region us-region" aria-label="US Market">
+                    <div class="market-region-title">
+                        <span><b class="region-code">US</b> U.S. MARKET // 美國市場</span>
+                        <span class="region-live-hint">NASDAQ・SOX・CME</span>
+                    </div>
+                    <div class="market-region-grid">
+                        <div class="market-pulse-item market-us" data-market-group="US">
+                            <label>NASDAQ 100 FUT // 那斯達克100期貨</label>
+                            <div class="value neutral" id="mpNasdaqFutValue">--</div>
+                            <div class="sub neutral" id="mpNasdaqFutChange">等待元大 LIVE</div>
+                        </div>
+
+                        <div class="market-pulse-item market-us" data-market-group="US">
+                            <label>NASDAQ COMP // 那斯達克指數</label>
+                            <div class="value neutral" id="mpNasdaqCompValue">--</div>
+                            <div class="sub neutral" id="mpNasdaqCompChange">等待元大 LIVE</div>
+                        </div>
+
+                        <div class="market-pulse-item market-us" data-market-group="US">
+                            <label>SOX // 費半指數</label>
+                            <div class="value neutral" id="mpSoxValue">--</div>
+                            <div class="sub neutral" id="mpSoxChange">等待元大 LIVE</div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <div class="market-pulse-source" id="mpSourceText">
-                DATA SOURCE ｜TWSE TAIEX + TAIFEX TX
+                DATA SOURCE ｜YUANTA SPARK API PROD // TWSE・TAIFEX・U.S. MARKET // QUOTE-ONLY // LOCAL BRIDGE
             </div>
         </div>
     </div>
@@ -2224,20 +2470,20 @@
                     <div class="value" id="srHigh20">--</div>
                 </div>
                 <div class="info-item">
-                    <label>近20日低點 // 短期支撐</label>
-                    <div class="value" id="srLow20">--</div>
-                </div>
-                <div class="info-item">
                     <label>近60日高點 // 中期壓力</label>
                     <div class="value" id="srHigh60">--</div>
                 </div>
                 <div class="info-item">
-                    <label>近60日低點 // 中期支撐</label>
-                    <div class="value" id="srLow60">--</div>
-                </div>
-                <div class="info-item">
                     <label>樞紐壓力 R1 // 隔日參考</label>
                     <div class="value" id="srR1">--</div>
+                </div>
+                <div class="info-item">
+                    <label>近20日低點 // 短期支撐</label>
+                    <div class="value" id="srLow20">--</div>
+                </div>
+                <div class="info-item">
+                    <label>近60日低點 // 中期支撐</label>
+                    <div class="value" id="srLow60">--</div>
                 </div>
                 <div class="info-item">
                     <label>樞紐支撐 S1 // 隔日參考</label>
@@ -2788,6 +3034,246 @@
             : fetchTwseRecentCloses(stockNo, minCount, maxMonthsToTry);
     }
 
+
+    /* ============================================================
+       📈 SELECTED STOCK YUANTA LIVE LAYER v1
+       - Web sends ONLY stock code + TWSE/TPEx to localhost.
+       - No account/password/certificate/API secret exists in browser code.
+       - Historical bars remain the analysis backbone.
+       - Fresh Yuanta OHLC/price is overlaid as today's current bar.
+       - Yuanta TotalVol is intentionally NOT injected into Volume Engine
+         until its unit is normalized against the historical DB.
+       ============================================================ */
+    const PLOUTOS_LOCAL_QUOTE_BASE = 'http://127.0.0.1:8765';
+    const PLOUTOS_STOCK_LIVE_STALE_MS = 20000;
+    let ploutosStockLiveTimer = null;
+    let ploutosAnalysisCache = {
+        stockNo: null,
+        portfolioName: '',
+        baseCloses: null
+    };
+    let ploutosLastStockLiveMode = 'STATIC';
+
+    function ploutosTodayDateStr() {
+        const d = new Date();
+        return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    async function ploutosSelectLocalStock(stockNo) {
+        if (!stockNo) return false;
+        const market = getStockMarket(stockNo) === 'TPEx' ? 'TPEx' : 'TWSE';
+        try {
+            const res = await fetch(`${PLOUTOS_LOCAL_QUOTE_BASE}/select-stock`, {
+                method: 'POST',
+                cache: 'no-store',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbol: stockNo, market})
+            });
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function ploutosFetchStockLive(stockNo) {
+        if (!stockNo) return null;
+        try {
+            const res = await fetch(
+                `${PLOUTOS_LOCAL_QUOTE_BASE}/yuanta-stock-live.json?_=${Date.now()}`,
+                {cache:'no-store'}
+            );
+            if (!res.ok) return null;
+            const raw = await res.json();
+            if (String(raw?.symbol || '').toUpperCase() !== String(stockNo).toUpperCase()) return null;
+
+            const snap = raw?.snapshot;
+            if (!snap || String(snap.code || '').toUpperCase() !== String(stockNo).toUpperCase()) return null;
+
+            const deal = Number(snap.deal);
+            if (!Number.isFinite(deal) || deal <= 0) return null;
+
+            const updatedMs = Date.parse(raw.updatedAt || snap.receivedAt || '');
+            const fresh = !Number.isFinite(updatedMs)
+                ? false
+                : (Date.now() - updatedMs <= PLOUTOS_STOCK_LIVE_STALE_MS);
+
+            if (!fresh || raw.status !== 'LIVE') return null;
+
+            return {
+                source: 'YUANTA_LIVE',
+                symbol: String(stockNo),
+                market: raw.market || getStockMarket(stockNo),
+                updatedAt: raw.updatedAt,
+                snapshot: {
+                    code: String(snap.code),
+                    name: String(snap.name || ''),
+                    deal,
+                    yesterday: Number.isFinite(Number(snap.yesterday)) ? Number(snap.yesterday) : null,
+                    open: Number.isFinite(Number(snap.open)) && Number(snap.open) > 0 ? Number(snap.open) : deal,
+                    high: Number.isFinite(Number(snap.high)) && Number(snap.high) > 0 ? Number(snap.high) : deal,
+                    low: Number.isFinite(Number(snap.low)) && Number(snap.low) > 0 ? Number(snap.low) : deal,
+                    bid: Number.isFinite(Number(snap.bid)) ? Number(snap.bid) : null,
+                    ask: Number.isFinite(Number(snap.ask)) ? Number(snap.ask) : null,
+                    totalVol: Number.isFinite(Number(snap.totalVol)) ? Number(snap.totalVol) : null
+                }
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function ploutosMergeLiveIntoCloses(baseCloses, live) {
+        if (!Array.isArray(baseCloses) || !baseCloses.length || !live?.snapshot) {
+            return Array.isArray(baseCloses) ? baseCloses.slice() : [];
+        }
+
+        const rows = baseCloses.map(x => ({...x}));
+        const s = live.snapshot;
+        const todayStr = ploutosTodayDateStr();
+
+        // Keep Volume Engine safe until Yuanta TotalVol unit is normalized.
+        // NaN makes the existing volume confirmation layer mark today's live bar
+        // as "volume data unavailable" instead of comparing incompatible units.
+        const liveBar = {
+            date: new Date(),
+            dateStr: todayStr,
+            open: s.open,
+            close: s.deal,
+            high: Math.max(s.high, s.deal),
+            low: Math.min(s.low, s.deal),
+            volume: NaN,
+            yuantaLive: true,
+            yuantaUpdatedAt: live.updatedAt
+        };
+
+        const last = rows[rows.length - 1];
+        if (last?.dateStr === todayStr) {
+            rows[rows.length - 1] = {
+                ...last,
+                ...liveBar
+            };
+        } else {
+            rows.push(liveBar);
+        }
+
+        return rows;
+    }
+
+    function ploutosSyncMarketPriceFromLive(price) {
+        const input = document.getElementById('marketPrice');
+        if (!input || !Number.isFinite(Number(price)) || Number(price) <= 0) return;
+        input.value = Number(price);
+        try { calculate(false); } catch (e) {}
+    }
+
+    function ploutosRenderAnalysisFromCloses(closes, stockNo, statusEl, liveMeta = null) {
+        if (!Array.isArray(closes) || !closes.length) return;
+
+        const valueIds = { ma5: 'ma5Value', ma10: 'ma10Value', ma20: 'ma20Value', ma60: 'ma60Value' };
+        const biasIds = { ma5: 'ma5Bias', ma10: 'ma10Bias', ma20: 'ma20Bias', ma60: 'ma60Bias' };
+
+        const latest = closes[closes.length - 1];
+        const prevClose = closes.length >= 2 ? closes[closes.length - 2] : null;
+
+        renderLatestPrice({
+            latest,
+            prevClose,
+            source: liveMeta ? 'YUANTA_LIVE' : 'STATIC',
+            updatedAt: liveMeta?.updatedAt || null
+        });
+
+        const periods = { ma5: 5, ma10: 10, ma20: 20, ma60: 60 };
+
+        Object.entries(periods).forEach(([key, period]) => {
+            const el = document.getElementById(valueIds[key]);
+            const biasEl = document.getElementById(biasIds[key]);
+            const val = calcSMAAt(closes, period, 0);
+            const prevVal = calcSMAAt(closes, period, 1);
+
+            if (val === null) {
+                el.textContent = '資料不足';
+                el.className = 'value neutral';
+                biasEl.textContent = '';
+                return;
+            }
+
+            let priceVsMaClass = 'value';
+            let biasClass = 'ma-bias';
+            if (latest.close > val) {
+                priceVsMaClass = 'value above';
+                biasClass = 'ma-bias above';
+            } else if (latest.close < val) {
+                priceVsMaClass = 'value below';
+                biasClass = 'ma-bias below';
+            }
+            el.className = priceVsMaClass;
+
+            const biasPct = ((latest.close - val) / val) * 100;
+            const biasSign = biasPct > 0 ? '+' : '';
+            biasEl.textContent = `乖離 ${biasSign}${formatNumber(biasPct, 2)}%`;
+            biasEl.className = biasClass;
+
+            let arrowChar = '▬';
+            let arrowColor = 'var(--neutral-color)';
+            if (prevVal !== null) {
+                if (val > prevVal) {
+                    arrowChar = '▲';
+                    arrowColor = 'var(--profit-color)';
+                } else if (val < prevVal) {
+                    arrowChar = '▼';
+                    arrowColor = 'var(--loss-color)';
+                }
+            }
+            el.innerHTML = `$${formatNumber(val, 2)} <span style="color:${arrowColor}; font-size:0.8em;">${arrowChar}</span>`;
+        });
+
+        if (statusEl) {
+            if (liveMeta) {
+                const stamp = liveMeta.updatedAt || '剛剛';
+                statusEl.textContent = `🟢 YUANTA LIVE 現價｜${stamp}｜歷史 ${ploutosAnalysisCache.baseCloses?.length || '--'} 日 + 即時今日價格｜量能確認暫以歷史資料為主`;
+            } else {
+                statusEl.textContent = `🟡 STATIC / HISTORY｜資料日期：${latest.dateStr}（共 ${closes.length} 個交易日）`;
+            }
+        }
+
+        updateTechnicalChart(closes);
+        const sr = computeSupportResistance(closes);
+        renderSupportResistance(sr);
+        renderPloutosGuide(computePloutosGuide(closes, sr, stockNo, liveMeta ? { source: 'YUANTA_LIVE', price: latest.close, updatedAt: liveMeta.updatedAt } : { source: 'STATIC', price: latest.close }));
+
+        if (liveMeta) {
+            ploutosSyncMarketPriceFromLive(latest.close);
+        }
+    }
+
+    async function ploutosRefreshSelectedStockLiveFromCache() {
+        const cache = ploutosAnalysisCache;
+        if (!cache.stockNo || !Array.isArray(cache.baseCloses) || !cache.baseCloses.length) return;
+
+        const currentCode = extractStockCode(document.getElementById('portfolioName')?.value || '');
+        if (currentCode !== cache.stockNo) return;
+
+        const statusEl = document.getElementById('maStatusText');
+        const live = await ploutosFetchStockLive(cache.stockNo);
+
+        if (live) {
+            const merged = ploutosMergeLiveIntoCloses(cache.baseCloses, live);
+            ploutosRenderAnalysisFromCloses(merged, cache.stockNo, statusEl, live);
+            ploutosLastStockLiveMode = 'LIVE';
+        } else if (ploutosLastStockLiveMode === 'LIVE') {
+            // Bridge went offline/stale: immediately restore the untouched historical analysis.
+            ploutosRenderAnalysisFromCloses(cache.baseCloses, cache.stockNo, statusEl, null);
+            ploutosLastStockLiveMode = 'STATIC';
+        }
+    }
+
+    function startPloutosStockLiveAutoRefresh() {
+        if (ploutosStockLiveTimer) clearInterval(ploutosStockLiveTimer);
+        ploutosStockLiveTimer = setInterval(() => {
+            ploutosRefreshSelectedStockLiveFromCache().catch(() => {});
+        }, 5000);
+    }
+
     /* 📈 主流程：抓取股價並更新均線落點顯示 */
     async function fetchMovingAverages(portfolioName) {
         const statusEl = document.getElementById('maStatusText');
@@ -2800,7 +3286,10 @@
             el.textContent = '--';
             el.className = 'value';
         });
-        Object.values(biasIds).forEach(id => { document.getElementById(id).textContent = ''; });
+        Object.values(biasIds).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '';
+        });
         renderLatestPrice(null);
 
         const cleanName = (portfolioName || '').trim();
@@ -2818,14 +3307,18 @@
             return;
         }
 
+        // This sends ONLY the selected public stock code + market to localhost.
+        // If localhost is unavailable, historical/static analysis continues normally.
+        ploutosSelectLocalStock(stockNo).catch(() => {});
+
         const marketDisplay = getStockMarketDisplay(stockNo);
         statusEl.textContent = `📡 [${marketDisplay}] 擷取「${stockNo}」歷史股價中，請稍候...`;
 
         try {
-            const closes = await fetchRecentCloses(stockNo, 65);
+            const baseCloses = await fetchRecentCloses(stockNo, 65);
 
-            if (!closes || closes.length === 0) {
-                statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。`;
+            if (!baseCloses || baseCloses.length === 0) {
+                statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情，請稍後再按「更新所有數據」。`;
                 renderCrossAlert(null);
                 renderSupportResistance(null);
                 renderPloutosGuide(null);
@@ -2833,60 +3326,22 @@
                 return;
             }
 
-            const latest = closes[closes.length - 1];
-            const prevClose = closes.length >= 2 ? closes[closes.length - 2] : null;
-            renderLatestPrice({ latest, prevClose });
+            // Keep an untouched historical base. The live layer is an overlay only.
+            ploutosAnalysisCache = {
+                stockNo,
+                portfolioName: cleanName,
+                baseCloses: baseCloses.map(x => ({...x}))
+            };
 
-            const periods = { ma5: 5, ma10: 10, ma20: 20, ma60: 60 };
-
-            Object.entries(periods).forEach(([key, period]) => {
-                const el = document.getElementById(valueIds[key]);
-                const biasEl = document.getElementById(biasIds[key]);
-                const val = calcSMAAt(closes, period, 0);
-                const prevVal = calcSMAAt(closes, period, 1);
-
-                if (val === null) {
-                    el.textContent = '資料不足';
-                    el.className = 'value neutral';
-                    biasEl.textContent = '';
-                    return;
-                }
-
-                // 數字顏色：現在股價相對於這條均線的位置 (紅=股價在均線之上／綠=股價在均線之下)
-                let priceVsMaClass = 'value';
-                let biasClass = 'ma-bias';
-                if (latest.close > val) { priceVsMaClass = 'value above'; biasClass = 'ma-bias above'; }
-                else if (latest.close < val) { priceVsMaClass = 'value below'; biasClass = 'ma-bias below'; }
-                el.className = priceVsMaClass;
-
-                // 乖離率 = (現價 - 均線) / 均線 * 100%
-                const biasPct = ((latest.close - val) / val) * 100;
-                const biasSign = biasPct > 0 ? '+' : '';
-                biasEl.textContent = `乖離 ${biasSign}${formatNumber(biasPct, 2)}%`;
-                biasEl.className = biasClass;
-
-                // 箭頭顏色：均線本身相較「前一交易日」是上揚還是下彎 (紅▲=上揚／綠▼=下彎／灰▬=持平或資料不足)
-                let arrowChar = '▬';
-                let arrowColor = 'var(--neutral-color)';
-                if (prevVal !== null) {
-                    if (val > prevVal) { arrowChar = '▲'; arrowColor = 'var(--profit-color)'; }
-                    else if (val < prevVal) { arrowChar = '▼'; arrowColor = 'var(--loss-color)'; }
-                }
-
-                el.innerHTML = `$${formatNumber(val, 2)} <span style="color:${arrowColor}; font-size:0.8em;">${arrowChar}</span>`;
-            });
-
-            statusEl.textContent = `✅ 資料日期：${latest.dateStr}（共取得 ${closes.length} 個交易日）｜均線數字顏色：紅=股價在均線之上、綠=股價在均線之下｜箭頭：▲紅=均線上揚、▼綠=均線下彎`;
-
-            // 重複使用同一批資料，順便更新技術線圖與黃金/死亡交叉提示，避免重複打 API
-            updateTechnicalChart(closes);
-
-            // 同樣重複使用這批資料計算支撐/壓力價位，無需額外連線
-            const sr = computeSupportResistance(closes);
-            renderSupportResistance(sr);
-
-            // PLOUTOS 新手決策引擎：直接整合 MA / 交叉訊號 / 支撐壓力，不新增 API
-            renderPloutosGuide(computePloutosGuide(closes, sr, stockNo));
+            const live = await ploutosFetchStockLive(stockNo);
+            if (live) {
+                const merged = ploutosMergeLiveIntoCloses(ploutosAnalysisCache.baseCloses, live);
+                ploutosRenderAnalysisFromCloses(merged, stockNo, statusEl, live);
+                ploutosLastStockLiveMode = 'LIVE';
+            } else {
+                ploutosRenderAnalysisFromCloses(ploutosAnalysisCache.baseCloses, stockNo, statusEl, null);
+                ploutosLastStockLiveMode = 'STATIC';
+            }
         } catch (error) {
             console.error('Moving average error:', error);
             statusEl.textContent = `❌ 均線資料擷取失敗，可能是網路問題，或 ${getStockMarketDisplay(stockNo)} 暫時無法連線，請稍後重試。`;
@@ -2897,8 +3352,7 @@
         }
     }
 
-
-    /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE
+    /* 🇹🇼 MARKET PULSE // STATIC SAME-DAY MARKET DATABASE (FAILOVER LAYER)
        v4.8.8：保留最後兩個有效交易日比較；恢復標準 script 載入，修正空白頁問題。
        不再計算 MA5/10/20/60 與 MARKET TREND。 */
     function mpNumber(value) {
@@ -2920,7 +3374,38 @@
         if (subEl) subEl.className = `sub ${cls}`;
     }
 
-    function refreshMarketPulse() {
+    const ploutosMarketPulseLast = Object.create(null);
+
+    function ploutosFlashMarketCard(valueEl, key, newValue) {
+        if (!valueEl || !key || !Number.isFinite(Number(newValue))) return;
+
+        const current = Number(newValue);
+        const previous = ploutosMarketPulseLast[key];
+        ploutosMarketPulseLast[key] = current;
+
+        // First received quote establishes the baseline and must not flash.
+        if (!Number.isFinite(previous) || previous === current) return;
+
+        const card = valueEl.closest('.market-pulse-item');
+        if (!card) return;
+
+        const cls = current > previous
+            ? 'quote-flash-up'
+            : (current < previous ? 'quote-flash-down' : 'quote-flash-flat');
+
+        card.classList.remove('quote-flash-up', 'quote-flash-down', 'quote-flash-flat');
+        // Force reflow so repeated changes can restart the animation every polling cycle.
+        void card.offsetWidth;
+        card.classList.add(cls);
+
+        clearTimeout(card._ploutosQuoteFlashTimer);
+        card._ploutosQuoteFlashTimer = setTimeout(() => {
+            card.classList.remove('quote-flash-up', 'quote-flash-down', 'quote-flash-flat');
+        }, 760);
+    }
+
+
+    function refreshMarketPulseStatic() {
         const status = document.getElementById('marketPulseStatus');
         const sourceText = document.getElementById('mpSourceText');
 
@@ -3080,6 +3565,287 @@
             console.error('Static Market Pulse error:', error);
             if (status) status.textContent = `❌ market-data.js 解析失敗：${error.message || error}`;
         }
+    }
+
+
+    /* ============================================================
+       ⚡ PLOUTOS MARKET PULSE // YUANTA LIVE + ROBUST FAILOVER v2
+       Priority:
+       1) Fresh Yuanta LIVE
+       2) STATIC MARKET DB (market-data.js)
+       3) Last Yuanta quote as STALE (only if static DB is unavailable)
+       4) NO DATA
+
+       SECURITY:
+       Browser only reads sanitized quote JSON from localhost.
+       No account / password / certificate / API secret is stored here.
+       ============================================================ */
+    const PLOUTOS_YUANTA_LIVE_URLS = [
+        'http://127.0.0.1:8765/yuanta-market-pulse-live.json',
+        './yuanta-market-pulse-live.json'
+    ];
+    const PLOUTOS_LIVE_STALE_MS = 20000;
+    let ploutosMarketPulseTimer = null;
+    let ploutosLastYuantaQuote = null;
+
+    function mpPick(obj, paths) {
+        for (const path of paths) {
+            let cur = obj;
+            for (const key of path.split('.')) cur = cur && cur[key];
+            if (cur !== undefined && cur !== null && cur !== '') return cur;
+        }
+        return null;
+    }
+
+    function mpNormalizeLive(raw) {
+        const taiex = mpPick(raw, ['taiex','TAIEX','index','market.taiex','data.taiex','IX0001']);
+        const tx = mpPick(raw, ['tx','TX','tx_front','txFront','futures','market.tx','data.tx','TXF1']);
+        const txAll = mpPick(raw, ['txAll','tx_all','TXALL','market.txAll','data.txAll','TXFF']);
+        const nasdaqFut = mpPick(raw, ['nasdaqFut','nasdaq_fut','market.nasdaqFut','data.nasdaqFut']);
+        const nasdaqComp = mpPick(raw, ['nasdaqComp','nasdaq_comp','COMP','market.nasdaqComp','data.nasdaqComp']);
+        const sox = mpPick(raw, ['sox','SOX','market.sox','data.sox']);
+        const updatedRaw = mpPick(raw, ['updatedAt','updated_at','timestamp','time','generatedAt','meta.updatedAt']);
+        const updatedMs = updatedRaw ? Date.parse(updatedRaw) : NaN;
+
+        const num = (...vals) => {
+            for (const v of vals) {
+                const n = Number(v);
+                if (Number.isFinite(n)) return n;
+            }
+            return null;
+        };
+
+        const tObj = (taiex && typeof taiex === 'object') ? taiex : {};
+        const xObj = (tx && typeof tx === 'object') ? tx : {};
+        const xaObj = (txAll && typeof txAll === 'object') ? txAll : {};
+        const nfObj = (nasdaqFut && typeof nasdaqFut === 'object') ? nasdaqFut : {};
+        const ncObj = (nasdaqComp && typeof nasdaqComp === 'object') ? nasdaqComp : {};
+        const soxObj = (sox && typeof sox === 'object') ? sox : {};
+
+        const taiexDeal = num(tObj.deal, tObj.close, tObj.price, tObj.last, mpPick(raw,['taiex_deal','taiexDeal']));
+        const taiexYst = num(tObj.yst, tObj.yesterday, tObj.prevClose, tObj.previousClose, mpPick(raw,['taiex_yst','taiexYst']));
+        const txDeal = num(xObj.deal, xObj.close, xObj.price, xObj.last, mpPick(raw,['tx_deal','txDeal']));
+        const txYst = num(xObj.yst, xObj.yesterday, xObj.prevClose, xObj.previousClose, mpPick(raw,['tx_yst','txYst']));
+        const txAllDeal = num(xaObj.deal, xaObj.close, xaObj.price, xaObj.last, mpPick(raw,['tx_all_deal','txAllDeal']));
+        const txAllYst = num(xaObj.yst, xaObj.yesterday, xaObj.prevClose, xaObj.previousClose, mpPick(raw,['tx_all_yst','txAllYst']));
+        const nasdaqFutDeal = num(nfObj.deal, nfObj.close, nfObj.price, nfObj.last);
+        const nasdaqFutYst = num(nfObj.yst, nfObj.yesterday, nfObj.prevClose, nfObj.previousClose);
+        const nasdaqCompDeal = num(ncObj.deal, ncObj.close, ncObj.price, ncObj.last);
+        const nasdaqCompYst = num(ncObj.yst, ncObj.yesterday, ncObj.prevClose, ncObj.previousClose);
+        const soxDeal = num(soxObj.deal, soxObj.close, soxObj.price, soxObj.last);
+        const soxYst = num(soxObj.yst, soxObj.yesterday, soxObj.prevClose, soxObj.previousClose);
+
+        let taiexChange = num(tObj.change, mpPick(raw,['taiex_change','taiexChange']));
+        let txChange = num(xObj.change, mpPick(raw,['tx_change','txChange']));
+        let txAllChange = num(xaObj.change, mpPick(raw,['tx_all_change','txAllChange']));
+        let nasdaqFutChange = num(nfObj.change);
+        let nasdaqCompChange = num(ncObj.change);
+        let soxChange = num(soxObj.change);
+        if (!Number.isFinite(taiexChange) && Number.isFinite(taiexDeal) && Number.isFinite(taiexYst)) taiexChange = taiexDeal - taiexYst;
+        if (!Number.isFinite(txChange) && Number.isFinite(txDeal) && Number.isFinite(txYst)) txChange = txDeal - txYst;
+        if (!Number.isFinite(txAllChange) && Number.isFinite(txAllDeal) && Number.isFinite(txAllYst)) txAllChange = txAllDeal - txAllYst;
+        if (!Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutDeal) && Number.isFinite(nasdaqFutYst)) nasdaqFutChange = nasdaqFutDeal - nasdaqFutYst;
+        if (!Number.isFinite(nasdaqCompChange) && Number.isFinite(nasdaqCompDeal) && Number.isFinite(nasdaqCompYst)) nasdaqCompChange = nasdaqCompDeal - nasdaqCompYst;
+        if (!Number.isFinite(soxChange) && Number.isFinite(soxDeal) && Number.isFinite(soxYst)) soxChange = soxDeal - soxYst;
+
+        let taiexPct = num(tObj.changePct, tObj.change_pct, mpPick(raw,['taiex_change_pct','taiexChangePct']));
+        let txPct = num(xObj.changePct, xObj.change_pct, mpPick(raw,['tx_change_pct','txChangePct']));
+        let txAllPct = num(xaObj.changePct, xaObj.change_pct, mpPick(raw,['tx_all_change_pct','txAllChangePct']));
+        let nasdaqFutPct = num(nfObj.changePct, nfObj.change_pct);
+        let nasdaqCompPct = num(ncObj.changePct, ncObj.change_pct);
+        let soxPct = num(soxObj.changePct, soxObj.change_pct);
+        if (!Number.isFinite(taiexPct) && Number.isFinite(taiexChange) && Number.isFinite(taiexYst) && taiexYst) taiexPct = taiexChange / taiexYst * 100;
+        if (!Number.isFinite(txPct) && Number.isFinite(txChange) && Number.isFinite(txYst) && txYst) txPct = txChange / txYst * 100;
+        if (!Number.isFinite(txAllPct) && Number.isFinite(txAllChange) && Number.isFinite(txAllYst) && txAllYst) txAllPct = txAllChange / txAllYst * 100;
+        if (!Number.isFinite(nasdaqFutPct) && Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutYst) && nasdaqFutYst) nasdaqFutPct = nasdaqFutChange / nasdaqFutYst * 100;
+        if (!Number.isFinite(nasdaqCompPct) && Number.isFinite(nasdaqCompChange) && Number.isFinite(nasdaqCompYst) && nasdaqCompYst) nasdaqCompPct = nasdaqCompChange / nasdaqCompYst * 100;
+        if (!Number.isFinite(soxPct) && Number.isFinite(soxChange) && Number.isFinite(soxYst) && soxYst) soxPct = soxChange / soxYst * 100;
+
+        let basis = num(
+            (raw && raw.basis && typeof raw.basis === 'object') ? raw.basis.value : raw?.basis,
+            mpPick(raw,['BASIS','market.basis','data.basis'])
+        );
+        if (!Number.isFinite(basis) && Number.isFinite(taiexDeal) && Number.isFinite(txDeal)) basis = txDeal - taiexDeal;
+
+        return {
+            taiexDeal, taiexChange, taiexPct,
+            txDeal, txChange, txPct,
+            txAllDeal, txAllChange, txAllPct,
+            nasdaqFutDeal, nasdaqFutChange, nasdaqFutPct,
+            nasdaqCompDeal, nasdaqCompChange, nasdaqCompPct,
+            soxDeal, soxChange, soxPct,
+            basis, updatedRaw, updatedMs
+        };
+    }
+
+    function mpRenderQuote(d, mode = 'LIVE', sourceUrl = '') {
+        if (!d || !Number.isFinite(d.taiexDeal) || !Number.isFinite(d.txDeal)) return false;
+
+        const yxv = document.getElementById('mpYuantaTxAllValue');
+        const yxc = document.getElementById('mpYuantaTxAllChange');
+        const nfv = document.getElementById('mpNasdaqFutValue'), nfc = document.getElementById('mpNasdaqFutChange');
+        const ncv = document.getElementById('mpNasdaqCompValue'), ncc = document.getElementById('mpNasdaqCompChange');
+        const sv = document.getElementById('mpSoxValue'), sc = document.getElementById('mpSoxChange');
+        const tv = document.getElementById('mpTaiexValue');
+        const tc = document.getElementById('mpTaiexChange');
+        const xv = document.getElementById('mpTxValue');
+        const xc = document.getElementById('mpTxChange');
+        const bb = document.getElementById('mpBasisBox');
+        const bv = document.getElementById('mpBasisValue');
+        const bl = document.getElementById('mpBasisLabel');
+
+        if (nfv) nfv.textContent = mpFormat(d.nasdaqFutDeal,2);
+        if (nfc) nfc.textContent = Number.isFinite(d.nasdaqFutChange) ? `${d.nasdaqFutChange>=0?'+':''}${mpFormat(d.nasdaqFutChange,2)} (${d.nasdaqFutPct>=0?'+':''}${mpFormat(d.nasdaqFutPct,2)}%)` : mode;
+        if (ncv) ncv.textContent = mpFormat(d.nasdaqCompDeal,2);
+        if (ncc) ncc.textContent = Number.isFinite(d.nasdaqCompChange) ? `${d.nasdaqCompChange>=0?'+':''}${mpFormat(d.nasdaqCompChange,2)} (${d.nasdaqCompPct>=0?'+':''}${mpFormat(d.nasdaqCompPct,2)}%)` : mode;
+        if (sv) sv.textContent = mpFormat(d.soxDeal,2);
+        if (sc) sc.textContent = Number.isFinite(d.soxChange) ? `${d.soxChange>=0?'+':''}${mpFormat(d.soxChange,2)} (${d.soxPct>=0?'+':''}${mpFormat(d.soxPct,2)}%)` : mode;
+        tv.textContent = mpFormat(d.taiexDeal, 2);
+        tc.textContent = Number.isFinite(d.taiexChange)
+            ? `${d.taiexChange >= 0 ? '+' : ''}${mpFormat(d.taiexChange, 2)}${Number.isFinite(d.taiexPct) ? ` (${d.taiexPct >= 0 ? '+' : ''}${mpFormat(d.taiexPct, 2)}%)` : ''}`
+            : mode;
+
+        xv.textContent = mpFormat(d.txDeal, 0);
+        xc.textContent = Number.isFinite(d.txChange)
+            ? `${d.txChange >= 0 ? '+' : ''}${mpFormat(d.txChange, 0)}${Number.isFinite(d.txPct) ? ` (${d.txPct >= 0 ? '+' : ''}${mpFormat(d.txPct, 2)}%)` : ''}`
+            : mode;
+
+        // Dedicated TX ALL card: uses the independent TXFF / txAll sanitized quote
+        // from the local Yuanta bridge, covering day + night-session updates.
+        if (yxv) yxv.textContent = mpFormat(d.txAllDeal, 0);
+        if (yxc) {
+            yxc.textContent = Number.isFinite(d.txAllChange)
+                ? `${d.txAllChange >= 0 ? '+' : ''}${mpFormat(d.txAllChange, 0)}${Number.isFinite(d.txAllPct) ? ` (${d.txAllPct >= 0 ? '+' : ''}${mpFormat(d.txAllPct, 2)}%)` : ''}`
+                : mode;
+        }
+
+        mpSetDirection(tv, tc, d.taiexChange || 0);
+        mpSetDirection(xv, xc, d.txChange || 0);
+        if (yxv && yxc) mpSetDirection(yxv, yxc, d.txAllChange || 0);
+        if (nfv && nfc) mpSetDirection(nfv,nfc,d.nasdaqFutChange||0);
+        if (ncv && ncc) mpSetDirection(ncv,ncc,d.nasdaqCompChange||0);
+        if (sv && sc) mpSetDirection(sv,sc,d.soxChange||0);
+
+        // Flash only when the actual deal price changed versus the previous 5-second poll.
+        ploutosFlashMarketCard(yxv, 'txAll', d.txAllDeal);
+        ploutosFlashMarketCard(nfv, 'nasdaqFut', d.nasdaqFutDeal);
+        ploutosFlashMarketCard(ncv, 'nasdaqComp', d.nasdaqCompDeal);
+        ploutosFlashMarketCard(sv, 'sox', d.soxDeal);
+        ploutosFlashMarketCard(tv, 'taiex', d.taiexDeal);
+        ploutosFlashMarketCard(xv, 'txFront', d.txDeal);
+
+
+        bb.classList.remove('positive', 'negative');
+        if (Number.isFinite(d.basis)) {
+            bv.textContent = `${d.basis >= 0 ? '+' : ''}${mpFormat(d.basis, 2)}`;
+            const cls = d.basis > 0 ? 'up' : d.basis < 0 ? 'down' : 'neutral';
+            bv.className = `value ${cls}`;
+            bl.className = `sub ${cls}`;
+            bl.textContent = d.basis > 0
+                ? '正價差 // FUTURES PREMIUM'
+                : d.basis < 0
+                    ? '逆價差 // FUTURES DISCOUNT'
+                    : '平價差 // FLAT';
+            if (d.basis > 0) bb.classList.add('positive');
+            else if (d.basis < 0) bb.classList.add('negative');
+        }
+
+        const status = document.getElementById('marketPulseStatus');
+        const src = document.getElementById('mpSourceText');
+        const stamp = d.updatedRaw || new Date().toLocaleTimeString('zh-TW', {hour12:false});
+
+        if (mode === 'LIVE') {
+            if (status) status.textContent = `🟢 YUANTA LIVE｜${stamp}｜5 秒自動刷新`;
+            if (src) src.textContent = `DATA SOURCE ｜YUANTA SPARK API PROD // QUOTE-ONLY // ${sourceUrl.includes('127.0.0.1') ? 'LOCAL BRIDGE' : 'LOCAL JSON'}`;
+        } else {
+            if (status) status.textContent = `🟠 YUANTA STALE｜最後行情 ${stamp}｜STATIC DB 未載入`;
+            if (src) src.textContent = 'DATA SOURCE ｜LAST YUANTA QUOTE // LOCAL ONLY // STALE';
+        }
+        return true;
+    }
+
+    function mpStaticDbAvailable() {
+        return typeof MARKET_DATA !== 'undefined'
+            && MARKET_DATA
+            && (
+                MARKET_DATA.taiex
+                || MARKET_DATA.tx
+            );
+    }
+
+    async function mpEnsureStaticDbLoaded() {
+        if (mpStaticDbAvailable()) return true;
+
+        // Retry the normal relative market-data.js once.
+        // This helps if the script was delayed or temporarily failed.
+        return await new Promise((resolve) => {
+            const old = document.getElementById('ploutosMarketDataRetryScript');
+            if (old) old.remove();
+
+            const script = document.createElement('script');
+            script.id = 'ploutosMarketDataRetryScript';
+            script.src = `market-data.js?_=${Date.now()}`;
+            script.async = true;
+            script.onload = () => resolve(mpStaticDbAvailable());
+            script.onerror = () => resolve(false);
+            document.head.appendChild(script);
+
+            setTimeout(() => resolve(mpStaticDbAvailable()), 3000);
+        });
+    }
+
+    async function refreshMarketPulse() {
+        let staleCandidate = null;
+
+        // 1) Fresh Yuanta LIVE
+        for (const url of PLOUTOS_YUANTA_LIVE_URLS) {
+            try {
+                const res = await fetch(`${url}?_=${Date.now()}`, {cache:'no-store'});
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const raw = await res.json();
+                const d = mpNormalizeLive(raw);
+
+                if (Number.isFinite(d.taiexDeal) && Number.isFinite(d.txDeal)) {
+                    ploutosLastYuantaQuote = d;
+                    const isStale = Number.isFinite(d.updatedMs)
+                        && (Date.now() - d.updatedMs > PLOUTOS_LIVE_STALE_MS);
+
+                    if (!isStale && mpRenderQuote(d, 'LIVE', url)) return true;
+                    staleCandidate = d;
+                }
+            } catch (e) {
+                // Try next live source.
+            }
+        }
+
+        // 2) STATIC MARKET DB
+        let staticReady = mpStaticDbAvailable();
+        if (!staticReady) staticReady = await mpEnsureStaticDbLoaded();
+
+        if (staticReady) {
+            refreshMarketPulseStatic();
+            const status = document.getElementById('marketPulseStatus');
+            if (status) status.textContent = `🟡 YUANTA LIVE OFFLINE｜已切換 STATIC MARKET DB｜${status.textContent.replace(/^✅\s*/, '')}`;
+            return false;
+        }
+
+        // 3) Last Yuanta quote as STALE if static DB cannot be loaded.
+        const last = staleCandidate || ploutosLastYuantaQuote;
+        if (last && mpRenderQuote(last, 'STALE')) return false;
+
+        // 4) Truly no data.
+        const status = document.getElementById('marketPulseStatus');
+        const src = document.getElementById('mpSourceText');
+        if (status) status.textContent = '🔴 MARKET DATA OFFLINE｜YUANTA 與 STATIC DB 均無法取得';
+        if (src) src.textContent = 'DATA SOURCE ｜NO DATA';
+        return false;
+    }
+
+    function startMarketPulseAutoRefresh() {
+        if (ploutosMarketPulseTimer) clearInterval(ploutosMarketPulseTimer);
+        refreshMarketPulse();
+        ploutosMarketPulseTimer = setInterval(refreshMarketPulse, 5000);
     }
 
     function refreshMovingAverages() {
@@ -3290,7 +4056,7 @@
             return;
         }
 
-        const { latest, prevClose } = data;
+        const { latest, prevClose, source = 'STATIC', updatedAt = null } = data;
         const stockNo = extractStockCode(document.getElementById('portfolioName')?.value || '');
         const instrumentType = getStockTypeForUI(stockNo);
 
@@ -3323,7 +4089,10 @@
         valueEl.textContent = `$${formatTaiwanMarketPrice(latest.close, instrumentType)}`;
         valueEl.className = `latest-price-value ${cls}`;
 
-        changeEl.textContent = `${arrow} ${sign}${formatNumber(change, 2)} (${sign}${formatNumber(changePct, 2)}%)｜${latest.dateStr} 較前日 ${prevClose.dateStr}`;
+        const sourceSuffix = source === 'YUANTA_LIVE'
+            ? `｜🟢 YUANTA LIVE ${updatedAt ? String(updatedAt).slice(11,19) : ''}`
+            : `｜${latest.dateStr} 較前日 ${prevClose.dateStr}`;
+        changeEl.textContent = `${arrow} ${sign}${formatNumber(change, 2)} (${sign}${formatNumber(changePct, 2)}%)${sourceSuffix}`;
         changeEl.className = `latest-price-change ${cls}`;
 
         if (isLimitUp && boxEl && badgeEl) {
@@ -3407,7 +4176,19 @@
         const R1 = 2 * PP - L;
         const S1 = 2 * PP - H;
 
-        return { latestClose: C, high20, low20, high60, low60, R1, S1 };
+        const prevCloseForSR = closes.length >= 2 ? Number(closes[closes.length - 2]?.close) : null;
+        const dayChangeForSR = Number.isFinite(prevCloseForSR) ? C - prevCloseForSR : null;
+        const dayChangePctForSR = Number.isFinite(dayChangeForSR) && prevCloseForSR !== 0
+            ? (dayChangeForSR / prevCloseForSR) * 100
+            : null;
+
+        return {
+            latestClose: C,
+            prevClose: prevCloseForSR,
+            dayChange: dayChangeForSR,
+            dayChangePct: dayChangePctForSR,
+            high20, low20, high60, low60, R1, S1
+        };
     }
 
     function renderSupportResistance(sr) {
@@ -3440,7 +4221,10 @@
         applyLevel(ids.r1, sr.R1);
         applyLevel(ids.s1, sr.S1);
 
-        statusEl.textContent = `✅ 依現價 $${formatNumber(sr.latestClose, 2)} 計算｜紅=壓力（價位在現價之上）、綠=支撐（價位在現價之下）`;
+        const srPriceClass = Number.isFinite(sr.dayChange)
+            ? (sr.dayChange > 0 ? 'up' : sr.dayChange < 0 ? 'down' : 'neutral')
+            : 'neutral';
+        statusEl.innerHTML = `✅ 依現價 <span class="current-price-inline ${srPriceClass}">$${formatNumber(sr.latestClose, 2)}</span> 計算｜紅=壓力（價位在現價之上）、綠=支撐（價位在現價之下）`;
     }
 
 
@@ -3501,11 +4285,15 @@
         // 2) Institutional / margin chip confirmation layer
         // 3) Market regime / relative-strength filter
 
-    function computePloutosGuide(closes, sr, stockNo = null) {
+    function computePloutosGuide(closes, sr, stockNo = null, decisionMeta = null) {
         if (!closes || closes.length < 20 || !sr) return null;
 
         const latest = closes[closes.length - 1];
         const C = latest.close;
+        const decisionSource = decisionMeta?.source === 'YUANTA_LIVE' ? 'YUANTA_LIVE' : 'STATIC';
+        const liveDecisionPrice = Number(decisionMeta?.price);
+        const isYuantaLiveDecision = decisionSource === 'YUANTA_LIVE' && Number.isFinite(liveDecisionPrice) && liveDecisionPrice > 0;
+        const decisionPrice = isYuantaLiveDecision ? liveDecisionPrice : C;
         const ma5 = calcSMAAt(closes, 5, 0);
         const ma10 = calcSMAAt(closes, 10, 0);
         const ma20 = calcSMAAt(closes, 20, 0);
@@ -4031,11 +4819,22 @@
         const roundedEntryMid = (entryLow + entryHigh) / 2;
         const roundedProfitMid = (profitLow + profitHigh) / 2;
 
-        const risk = roundedEntryMid - stopLoss;
-        const reward = roundedProfitMid - roundedEntryMid;
+        // Entry-plan R/R remains the structural benchmark.
+        const planRisk = roundedEntryMid - stopLoss;
+        const planReward = roundedProfitMid - roundedEntryMid;
+        const planRR = planRisk > 0 ? planReward / planRisk : null;
+
+        // LIVE decision R/R: when Yuanta LIVE is available, evaluate the trade from
+        // the executable current deal price instead of the ideal Entry midpoint.
+        // This makes chasing toward TP1 automatically degrade R/R in real time.
+        const executionPrice = isYuantaLiveDecision
+            ? roundToTaiwanTick(decisionPrice, instrumentType)
+            : roundedEntryMid;
+        const risk = executionPrice - stopLoss;
+        const reward = roundedProfitMid - executionPrice;
         const rr = risk > 0 ? reward / risk : null;
-        const riskPct = risk > 0 ? (risk / roundedEntryMid) * 100 : null;
-        const rewardPct = reward > 0 ? (reward / roundedEntryMid) * 100 : null;
+        const riskPct = risk > 0 ? (risk / executionPrice) * 100 : null;
+        const rewardPct = reward > 0 ? (reward / executionPrice) * 100 : null;
 
         // ===== 7B) NET R/R：扣除實際交易成本 =====
         // Use current entered position quantity when available; otherwise use 100 shares as a transparent odd-lot model.
@@ -4062,7 +4861,7 @@
         };
         const rrTax = (amount) => amount > 0 ? Math.floor(amount * rrSellTaxRate) : 0;
 
-        const entryAmountRR = roundedEntryMid * rrQty;
+        const entryAmountRR = executionPrice * rrQty;
         const tp1AmountRR = roundedProfitMid * rrQty;
         const stopAmountRR = stopLoss * rrQty;
 
@@ -4072,8 +4871,8 @@
         const tpTaxRR = rrTax(tp1AmountRR);
         const stopTaxRR = rrTax(stopAmountRR);
 
-        const grossRewardAmountRR = (roundedProfitMid - roundedEntryMid) * rrQty;
-        const grossRiskAmountRR = (roundedEntryMid - stopLoss) * rrQty;
+        const grossRewardAmountRR = (roundedProfitMid - executionPrice) * rrQty;
+        const grossRiskAmountRR = (executionPrice - stopLoss) * rrQty;
 
         const netRewardAmountRR = grossRewardAmountRR - buyFeeRR - tpSellFeeRR - tpTaxRR;
         const netRiskAmountRR = grossRiskAmountRR + buyFeeRR + stopSellFeeRR + stopTaxRR;
@@ -4092,10 +4891,16 @@
             stopTaxRR,
             netRewardAmountRR,
             netRiskAmountRR,
-            netRR
+            netRR,
+            executionPrice,
+            executionSource: isYuantaLiveDecision ? 'YUANTA_LIVE_DEAL' : 'ENTRY_MID',
+            planRR
         };
 
-        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && roundedProfitMid > roundedEntryMid && rr > 0 && Number.isFinite(netRR) && netRR > 0)) {
+        // Structural validity is judged from Entry -> TP1 -> Stop geometry.
+        // LIVE price is allowed to move beyond Entry/TP/Stop; that is a decision signal,
+        // not a reason to erase the underlying zones.
+        if (!(entryLow <= entryHigh && profitLow <= profitHigh && stopLoss < entryLow && roundedProfitMid > roundedEntryMid && Number.isFinite(planRR) && planRR > 0)) {
             return { bias, trendScore, noSetup: true, reason: '目前價位結構缺乏合理的進場、停利與停損排列，建議等待更清楚的型態。' };
         }
 
@@ -4171,33 +4976,62 @@
             }
         }
 
-        const distanceToEntryPct = ((C - entryHigh) / C) * 100;
-        const distanceToProfitPct = ((profitLow - C) / C) * 100;
+        const distanceToEntryPct = ((decisionPrice - entryHigh) / decisionPrice) * 100;
+        const distanceToProfitPct = ((profitLow - decisionPrice) / decisionPrice) * 100;
         let action = { cls: 'neutral', title: '🟡 WATCH // 等待確認', reason: '目前尚未形成特別有利的進場條件。' };
+        let liveActionLocked = false;
+
+        // ===== 9) YUANTA LIVE EXECUTION DECISION =====
+        // The live deal price has priority for immediate Entry/Exit/Stop decisions.
+        // Structural zones remain visible even after price has crossed them.
+        if (isYuantaLiveDecision && decisionPrice <= stopLossHigh) {
+            action = {
+                cls: 'bearish',
+                title: '🔴 STOP LOSS // 即時跌破防守',
+                reason: `YUANTA LIVE $${formatNumber(decisionPrice, 2)} 已低於防守上緣 $${formatNumber(stopLossHigh, 2)}；結構失效風控優先，不等待收盤。`
+            };
+            liveActionLocked = true;
+        } else if (isYuantaLiveDecision && Number.isFinite(tp2Low) && decisionPrice >= tp2Low) {
+            action = {
+                cls: 'neutral',
+                title: '🟠 TAKE PROFIT // 已進入 TP2',
+                reason: `YUANTA LIVE $${formatNumber(decisionPrice, 2)} 已進入第二停利區，優先保護獲利並依紀律分批停利。`
+            };
+            liveActionLocked = true;
+        } else if (isYuantaLiveDecision && decisionPrice >= profitLow) {
+            action = {
+                cls: 'neutral',
+                title: decisionPrice > profitHigh ? '🟠 TP1 BROKEN // 突破第一目標' : '🟠 TAKE PROFIT // 已進入 TP1',
+                reason: decisionPrice > profitHigh
+                    ? `YUANTA LIVE $${formatNumber(decisionPrice, 2)} 已突破 TP1 上緣 $${formatNumber(profitHigh, 2)}；先分批停利，剩餘部位再觀察 TP2。`
+                    : `YUANTA LIVE $${formatNumber(decisionPrice, 2)} 已進入 TP1 $${formatNumber(profitLow, 2)}~$${formatNumber(profitHigh, 2)}；此處不宜追價。`
+            };
+            liveActionLocked = true;
+        }
 
         // 有任何 MA5/10/20 下彎時，即使整體排列偏多，也不直接鼓勵追價；
         // 優先等待價格回到下彎均線 / Fib 群聚的 Entry Zone。
-        if (priorityMA && C > entryHigh * 1.01) {
+        if (!liveActionLocked && priorityMA && decisionPrice > entryHigh * 1.01) {
             action = {
                 cls: 'neutral',
                 title: '🟡 WATCH // 等待回測',
                 reason: `${priorityMA.label}仍下彎，優先等待價格回測該均線附近，再觀察是否與 Fibonacci 支撐形成止跌。`
             };
-        } else if (trendScore <= -2) {
+        } else if (!liveActionLocked && trendScore <= -2) {
             action = { cls: 'bearish', title: '🔴 RISK OFF // 風險偏高', reason: '均線結構偏弱，接近支撐也建議先觀察止跌或重新站回短期均線。' };
-        } else if (distanceToProfitPct >= 0 && distanceToProfitPct <= 2.0) {
+        } else if (!liveActionLocked && distanceToProfitPct >= 0 && distanceToProfitPct <= 2.0) {
             action = { cls: 'neutral', title: '🟠 AVOID CHASING // 不宜追價', reason: '現價已靠近第一壓力/停利區，追價後的風險報酬空間較差。' };
-        } else if (C >= entryLow && C <= entryHigh * 1.006 && trendScore >= 3 && netRR >= 2) {
+        } else if (!liveActionLocked && decisionPrice >= entryLow && decisionPrice <= entryHigh * 1.006 && trendScore >= 3 && netRR >= 2) {
             action = { cls: 'bullish', title: '🟢 FAVORABLE ENTRY // 偏佳建倉', reason: '趨勢偏多、價格接近支撐群聚，且風險報酬比達 1:2 以上；仍建議分批而非一次投入。' };
-        } else if (distanceToEntryPct >= -0.5 && distanceToEntryPct <= 2.5 && trendScore >= 1 && netRR >= 1.5) {
+        } else if (!liveActionLocked && distanceToEntryPct >= -0.5 && distanceToEntryPct <= 2.5 && trendScore >= 1 && netRR >= 1.5) {
             action = { cls: 'bullish', title: '🟢 ACCUMULATE // 分批布局', reason: '價格接近建倉區，且均線 / Fibonacci 支撐結構尚可，可採分批觀察方式。' };
-        } else if (distanceToEntryPct > 2.5) {
+        } else if (!liveActionLocked && distanceToEntryPct > 2.5) {
             action = { cls: 'neutral', title: '🟡 WATCH // 等待回測', reason: '現價仍高於建倉參考區，等待回測支撐後可獲得較好的風險報酬結構。' };
         }
 
         // Volume 是最後的訊號確認層：可升級 / 降級 ACTION，但不改寫 Entry / TP 的價格位置。
-        if (volumeInfo.available) {
-            const atOrNearTP1 = C >= profitLow * 0.985;
+        if (volumeInfo.available && !liveActionLocked) {
+            const atOrNearTP1 = decisionPrice >= profitLow * 0.985;
             if (atOrNearTP1 && volRatio >= 1.5 && (bearishEngulfing || longUpperWick)) {
                 action = {
                     cls: 'neutral',
@@ -4276,7 +5110,8 @@
             entryLow, entryHigh, profitLow, profitHigh, stopLoss, stopLossHigh, warningLevel,
             tp2Low, tp2High,
             defenseSources, defenseState, defenseText,
-            rr, netRR, transactionCostInfo, riskPct, rewardPct, strength, exitStrength,
+            rr, planRR, netRR, transactionCostInfo, riskPct, rewardPct, strength, exitStrength,
+            decisionPrice, decisionSource, isYuantaLiveDecision,
             supportSources: supportCluster.map(x => x[0]),
             resistanceSources: resistanceCluster.map(x => x[0]),
             tp2Sources: tp2Cluster.map(x => x[0]),
@@ -4405,13 +5240,15 @@
         else if (data.netRR >= 1.5) rrLabel = '🟡 尚可';
         else if (data.netRR >= 1) rrLabel = '🟠 偏低';
 
-        rrEl.textContent = `NET 1 : ${formatNumber(data.netRR, 2)}  ${rrLabel}`;
+        rrEl.textContent = Number.isFinite(data.netRR)
+            ? `NET 1 : ${formatNumber(data.netRR, 2)}  ${rrLabel}`
+            : (data.isYuantaLiveDecision ? 'NET R/R：目前價位已超出 TP1 / Stop 可計算區間' : '--');
 
         // Visual scale: 0~2.5+ mapped to 0~100%.
         // Classification thresholds remain exactly: <1 / 1+ / 1.5+ / 2+.
         if (rrMarker) {
             const rrMeterMax = 2.5;
-            const rrPosition = Math.max(0, Math.min(100, (data.netRR / rrMeterMax) * 100));
+            const rrPosition = Number.isFinite(data.netRR) ? Math.max(0, Math.min(100, (data.netRR / rrMeterMax) * 100)) : 0;
             rrMarker.style.left = `${rrPosition}%`;
         }
         if (rrExplain) {
@@ -4421,7 +5258,12 @@
         }
 
         const taxPctText = formatNumber((data.transactionCostInfo?.rrSellTaxRate || 0) * 100, 1);
-        rrDetail.textContent = `Gross 1:${formatNumber(data.rr, 2)}｜Net已扣買賣手續費+賣出稅${taxPctText}%｜${data.transactionCostInfo?.rrQtySource || ''} ${formatNumber(data.transactionCostInfo?.rrQty || 0, 0)}股｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%`;
+        const rrSourceText = data.isYuantaLiveDecision
+            ? `🟢 YUANTA LIVE 現價 $${formatNumber(data.transactionCostInfo?.executionPrice, 2)} 起算`
+            : `Entry 中位 $${formatNumber(data.transactionCostInfo?.executionPrice, 2)} 起算`;
+        rrDetail.textContent = Number.isFinite(data.netRR)
+            ? `Gross 1:${formatNumber(data.rr, 2)}｜${rrSourceText}｜Net已扣買賣手續費+賣出稅${taxPctText}%｜${data.transactionCostInfo?.rrQtySource || ''} ${formatNumber(data.transactionCostInfo?.rrQty || 0, 0)}股｜潛在報酬 +${formatNumber(data.rewardPct, 1)}%｜潛在風險 -${formatNumber(data.riskPct, 1)}%｜結構Entry R/R 1:${formatNumber(data.planRR, 2)}`
+            : `${rrSourceText}｜現價已到達/越過 TP1 或跌破 Stop，改由 ACTION 即時風控判斷｜結構Entry R/R 1:${formatNumber(data.planRR, 2)}`;
 
         actionEl.textContent = data.action.title;
         actionEl.style.color = data.action.cls === 'bullish' ? 'var(--profit-color)' : data.action.cls === 'bearish' ? 'var(--loss-color)' : 'var(--accent-amber)';
@@ -4442,7 +5284,12 @@
                 ? '⚠️ OHLCV欄位缺失：量能/K棒確認已停用'
                 : '量能資料不足');
         const divergenceSummary = data.volumeInfo?.divergenceText ? `｜${data.volumeInfo.divergenceText}` : '';
-        statusEl.textContent = `現價 $${formatNumber(data.current, 2)}｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜${volSummary}${divergenceSummary}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜建議價已依台股跳動單位四捨五入`;
+        const guideDayChange = Number(data.volumeInfo?.dayChangePct);
+        const guidePriceClass = Number.isFinite(guideDayChange)
+            ? (guideDayChange > 0 ? 'up' : guideDayChange < 0 ? 'down' : 'neutral')
+            : 'neutral';
+        const guideSourceTag = data.isYuantaLiveDecision ? '🟢 YUANTA LIVE ENGINE' : '🟡 STATIC ENGINE';
+        statusEl.innerHTML = `${guideSourceTag}｜現價 <span class="current-price-inline ${guidePriceClass}">$${formatNumber(data.current, 2)}</span>｜趨勢分數 ${data.trendScore > 0 ? '+' : ''}${formatNumber(data.trendScore, 1)}｜${data.trendReasons.join(' / ') || '均線結構中性'}｜${volSummary}${divergenceSummary}｜Fib回撤基準 ${formatNumber(data.swingLow, 2)}~${formatNumber(data.swingHigh, 2)}｜建議價已依台股跳動單位四捨五入`;
     }
 
     function updateTechnicalChart(closes) {
@@ -5604,11 +6451,19 @@
         });
     }
 
-    // 🇹🇼 MARKET PULSE 初始載入：不阻塞其他 PLOUTOS 功能。
+    // 🇹🇼 MARKET PULSE 初始載入：YUANTA LIVE 優先，STATIC DB 自動備援。
     window.addEventListener('load', () => {
         setTimeout(() => {
-            try { refreshMarketPulse(); }
-            catch (e) { console.warn('Market Pulse initial load failed:', e); }
+            try {
+                startMarketPulseAutoRefresh();
+            } catch (e) {
+                console.warn('Market Pulse auto-refresh failed:', e);
+            }
+            try {
+                startPloutosStockLiveAutoRefresh();
+            } catch (e) {
+                console.warn('Selected Stock LIVE auto-refresh failed:', e);
+            }
         }, 900);
     });
 
