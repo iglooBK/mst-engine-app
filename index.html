@@ -3044,7 +3044,11 @@
        - Yuanta TotalVol is intentionally NOT injected into Volume Engine
          until its unit is normalized against the historical DB.
        ============================================================ */
-    const PLOUTOS_LOCAL_QUOTE_BASE = 'http://127.0.0.1:8765';
+    // LAN TEST: desktop tries localhost first; phones/tablets on home Wi-Fi use the LAN bridge.
+    const PLOUTOS_LOCAL_QUOTE_BASES = [
+        'http://127.0.0.1:8765',
+        'http://10.0.0.88:8765'
+    ];
     const PLOUTOS_STOCK_LIVE_STALE_MS = 20000;
     let ploutosStockLiveTimer = null;
     let ploutosAnalysisCache = {
@@ -3062,44 +3066,48 @@
     async function ploutosSelectLocalStock(stockNo) {
         if (!stockNo) return false;
         const market = getStockMarket(stockNo) === 'TPEx' ? 'TPEx' : 'TWSE';
-        try {
-            const res = await fetch(`${PLOUTOS_LOCAL_QUOTE_BASE}/select-stock`, {
-                method: 'POST',
-                cache: 'no-store',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({symbol: stockNo, market})
-            });
-            return res.ok;
-        } catch (e) {
-            return false;
+        for (const base of PLOUTOS_LOCAL_QUOTE_BASES) {
+            try {
+                const res = await fetch(`${base}/select-stock`, {
+                    method: 'POST',
+                    cache: 'no-store',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({symbol: stockNo, market})
+                });
+                if (res.ok) return true;
+            } catch (e) {
+                // Try next local/LAN bridge.
+            }
         }
+        return false;
     }
 
     async function ploutosFetchStockLive(stockNo) {
         if (!stockNo) return null;
-        try {
-            const res = await fetch(
-                `${PLOUTOS_LOCAL_QUOTE_BASE}/yuanta-stock-live.json?_=${Date.now()}`,
-                {cache:'no-store'}
-            );
-            if (!res.ok) return null;
-            const raw = await res.json();
-            if (String(raw?.symbol || '').toUpperCase() !== String(stockNo).toUpperCase()) return null;
+        for (const base of PLOUTOS_LOCAL_QUOTE_BASES) {
+            try {
+                const res = await fetch(
+                    `${base}/yuanta-stock-live.json?_=${Date.now()}`,
+                    {cache:'no-store'}
+                );
+                if (!res.ok) continue;
+                const raw = await res.json();
+                if (String(raw?.symbol || '').toUpperCase() !== String(stockNo).toUpperCase()) continue;
 
-            const snap = raw?.snapshot;
-            if (!snap || String(snap.code || '').toUpperCase() !== String(stockNo).toUpperCase()) return null;
+                const snap = raw?.snapshot;
+                if (!snap || String(snap.code || '').toUpperCase() !== String(stockNo).toUpperCase()) continue;
 
-            const deal = Number(snap.deal);
-            if (!Number.isFinite(deal) || deal <= 0) return null;
+                const deal = Number(snap.deal);
+                if (!Number.isFinite(deal) || deal <= 0) continue;
 
-            const updatedMs = Date.parse(raw.updatedAt || snap.receivedAt || '');
-            const fresh = !Number.isFinite(updatedMs)
-                ? false
-                : (Date.now() - updatedMs <= PLOUTOS_STOCK_LIVE_STALE_MS);
+                const updatedMs = Date.parse(raw.updatedAt || snap.receivedAt || '');
+                const fresh = !Number.isFinite(updatedMs)
+                    ? false
+                    : (Date.now() - updatedMs <= PLOUTOS_STOCK_LIVE_STALE_MS);
 
-            if (!fresh || raw.status !== 'LIVE') return null;
+                if (!fresh || raw.status !== 'LIVE') continue;
 
-            return {
+                return {
                 source: 'YUANTA_LIVE',
                 symbol: String(stockNo),
                 market: raw.market || getStockMarket(stockNo),
@@ -3116,10 +3124,12 @@
                     ask: Number.isFinite(Number(snap.ask)) ? Number(snap.ask) : null,
                     totalVol: Number.isFinite(Number(snap.totalVol)) ? Number(snap.totalVol) : null
                 }
-            };
-        } catch (e) {
-            return null;
+                };
+            } catch (e) {
+                // Try next local/LAN bridge.
+            }
         }
+        return null;
     }
 
     function ploutosMergeLiveIntoCloses(baseCloses, live) {
@@ -3582,6 +3592,7 @@
        ============================================================ */
     const PLOUTOS_YUANTA_LIVE_URLS = [
         'http://127.0.0.1:8765/yuanta-market-pulse-live.json',
+        'http://10.0.0.88:8765/yuanta-market-pulse-live.json',
         './yuanta-market-pulse-live.json'
     ];
     const PLOUTOS_LIVE_STALE_MS = 20000;
