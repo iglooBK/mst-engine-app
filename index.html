@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v4.3-public-SXFPMI6 | Frontend only | Yuanta credentials remain local | 3-sec live refresh -->
+<!-- PLOUTOS GitHub Release: MARKET-PULSE-ALIGNED-v2.9 | TW full row + US full row + centered JP -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -724,7 +724,7 @@
         /* 🇹🇼 MARKET PULSE // 台股大盤 */
         .market-pulse-regions {
             display: grid;
-            grid-template-columns: minmax(0, 1.06fr) minmax(0, .94fr);
+            grid-template-columns: 1fr;
             gap: 12px;
             margin-top: 12px;
             align-items: stretch;
@@ -759,6 +759,10 @@
             background: linear-gradient(90deg, #22d3ee 0%, rgba(34,211,238,.14) 62%, transparent 100%);
         }
 
+        .market-region.jp-region::before {
+            background: linear-gradient(90deg, #a855f7 0%, rgba(168,85,247,.16) 62%, transparent 100%);
+        }
+
         .market-region.tw-region,
         .market-region.us-region {
             box-shadow: 0 10px 28px rgba(0,0,0,.12);
@@ -781,6 +785,7 @@
 
         .tw-region .market-region-title > span:first-child { color: #f6b73c; }
         .us-region .market-region-title > span:first-child { color: #63d9ee; }
+        .jp-region .market-region-title > span:first-child { color: #b47cff; }
 
         .market-region-title .region-code {
             display: inline-flex;
@@ -813,20 +818,26 @@
 
         .market-region-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            grid-template-rows: repeat(2, minmax(0, 1fr));
-            gap: 8px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-rows: 1fr;
+            gap: 10px;
             flex: 1;
             min-height: 0;
         }
 
         .market-region.us-region .market-region-grid {
-            grid-template-columns: 1fr;
-            grid-template-rows: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: 1fr;
+        }
+
+        .market-region.jp-region .market-region-grid {
+            grid-template-columns: minmax(280px, 460px);
+            grid-template-rows: 1fr;
+            justify-content: center;
         }
 
         .market-region .market-pulse-item {
-            min-height: 102px;
+            min-height: 118px;
             height: 100%;
             border-radius: 7px;
             border: 1px solid rgba(71,91,122,.42);
@@ -961,13 +972,16 @@
 
         @media (max-width: 900px) {
             .market-pulse-regions { grid-template-columns: 1fr; }
-            .market-region.us-region .market-region-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .market-region-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr); }
+            .market-region.us-region .market-region-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 1fr; }
+            .market-region.jp-region .market-region-grid { grid-template-columns: minmax(260px, 420px); grid-template-rows: 1fr; }
         }
 
         @media (max-width: 760px) {
             .market-pulse-regions { grid-template-columns: 1fr; }
             .market-region-grid,
-            .market-region.us-region .market-region-grid {
+            .market-region.us-region .market-region-grid,
+            .market-region.jp-region .market-region-grid {
                 grid-template-columns: 1fr;
                 grid-template-rows: auto;
             }
@@ -2337,10 +2351,24 @@
                         </div>
                     </div>
                 </section>
+
+                <section class="market-region jp-region" aria-label="Japan Market">
+                    <div class="market-region-title">
+                        <span><b class="region-code">JP</b> JAPAN MARKET // 日本市場</span>
+                        <span class="region-live-hint">OSE・JPX</span>
+                    </div>
+                    <div class="market-region-grid">
+                        <div class="market-pulse-item market-us" data-market-group="JP">
+                            <label>NIKKEI 225 FUT // 大阪日經期貨</label>
+                            <div class="value neutral" id="mpNikkeiFutValue">--</div>
+                            <div class="sub neutral" id="mpNikkeiFutChange">等待元大 LIVE</div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <div class="market-pulse-source" id="mpSourceText">
-                DATA SOURCE ｜YUANTA SPARK API PROD // TWSE・TAIFEX・CME // NQ_2609・SXFPMI6 // QUOTE-ONLY // LOCAL BRIDGE
+                DATA SOURCE ｜YUANTA SPARK API PROD // TWSE・TAIFEX・CME・OSE // NQ_2609・SXFPMI6・NIKKEI 225 // QUOTE-ONLY // LOCAL BRIDGE
             </div>
         </div>
     </div>
@@ -3111,6 +3139,8 @@
                     name: String(snap.name || ''),
                     deal,
                     yesterday: Number.isFinite(Number(snap.yesterday)) ? Number(snap.yesterday) : null,
+                    upStopPrice: Number.isFinite(Number(snap.upStopPrice)) && Number(snap.upStopPrice) > 0 ? Number(snap.upStopPrice) : null,
+                    downStopPrice: Number.isFinite(Number(snap.downStopPrice)) && Number(snap.downStopPrice) > 0 ? Number(snap.downStopPrice) : null,
                     open: Number.isFinite(Number(snap.open)) && Number(snap.open) > 0 ? Number(snap.open) : deal,
                     high: Number.isFinite(Number(snap.high)) && Number(snap.high) > 0 ? Number(snap.high) : deal,
                     low: Number.isFinite(Number(snap.low)) && Number(snap.low) > 0 ? Number(snap.low) : deal,
@@ -3183,7 +3213,9 @@
             latest,
             prevClose,
             source: liveMeta ? 'YUANTA_LIVE' : 'STATIC',
-            updatedAt: liveMeta?.updatedAt || null
+            updatedAt: liveMeta?.updatedAt || null,
+            yuantaUpStopPrice: liveMeta?.snapshot?.upStopPrice ?? null,
+            yuantaDownStopPrice: liveMeta?.snapshot?.downStopPrice ?? null
         });
 
         const periods = { ma5: 5, ma10: 10, ma20: 20, ma60: 60 };
@@ -3608,6 +3640,7 @@
         const txAll = mpPick(raw, ['txAll','tx_all','TXALL','market.txAll','data.txAll','TXFF']);
         const nasdaqFut = mpPick(raw, ['nasdaqFut','nasdaq_fut','market.nasdaqFut','data.nasdaqFut']);
         const semiFut = mpPick(raw, ['semiFut','semi_fut','SXFPMI6','market.semiFut','data.semiFut']);
+        const nikkeiFut = mpPick(raw, ['nikkeiFut','nikkei_fut','market.nikkeiFut','data.nikkeiFut']);
         const updatedRaw = mpPick(raw, ['updatedAt','updated_at','timestamp','time','generatedAt','meta.updatedAt']);
         const updatedMs = updatedRaw ? Date.parse(updatedRaw) : NaN;
 
@@ -3624,6 +3657,7 @@
         const xaObj = (txAll && typeof txAll === 'object') ? txAll : {};
         const nfObj = (nasdaqFut && typeof nasdaqFut === 'object') ? nasdaqFut : {};
         const sfObj = (semiFut && typeof semiFut === 'object') ? semiFut : {};
+        const nkObj = (nikkeiFut && typeof nikkeiFut === 'object') ? nikkeiFut : {};
 
         const taiexDeal = num(tObj.deal, tObj.close, tObj.price, tObj.last, mpPick(raw,['taiex_deal','taiexDeal']));
         const taiexYst = num(tObj.yst, tObj.yesterday, tObj.prevClose, tObj.previousClose, mpPick(raw,['taiex_yst','taiexYst']));
@@ -3634,31 +3668,37 @@
         const nasdaqFutDeal = num(nfObj.deal, nfObj.close, nfObj.price, nfObj.last);
         const nasdaqFutYst = num(nfObj.yst, nfObj.yesterday, nfObj.prevClose, nfObj.previousClose);
         const semiFutDeal = num(sfObj.deal, sfObj.close, sfObj.price, sfObj.last);
+        const nikkeiFutDeal = num(nkObj.deal, nkObj.close, nkObj.price, nkObj.last);
         const semiFutYst = num(sfObj.yst, sfObj.yesterday, sfObj.prevClose, sfObj.previousClose);
+        const nikkeiFutYst = num(nkObj.yst, nkObj.yesterday, nkObj.prevClose, nkObj.previousClose);
 
         let taiexChange = num(tObj.change, mpPick(raw,['taiex_change','taiexChange']));
         let txChange = num(xObj.change, mpPick(raw,['tx_change','txChange']));
         let txAllChange = num(xaObj.change, mpPick(raw,['tx_all_change','txAllChange']));
         let nasdaqFutChange = num(nfObj.change);
         let semiFutChange = num(sfObj.change);
+        let nikkeiFutChange = num(nkObj.change);
 
         if (!Number.isFinite(taiexChange) && Number.isFinite(taiexDeal) && Number.isFinite(taiexYst)) taiexChange = taiexDeal - taiexYst;
         if (!Number.isFinite(txChange) && Number.isFinite(txDeal) && Number.isFinite(txYst)) txChange = txDeal - txYst;
         if (!Number.isFinite(txAllChange) && Number.isFinite(txAllDeal) && Number.isFinite(txAllYst)) txAllChange = txAllDeal - txAllYst;
         if (!Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutDeal) && Number.isFinite(nasdaqFutYst)) nasdaqFutChange = nasdaqFutDeal - nasdaqFutYst;
         if (!Number.isFinite(semiFutChange) && Number.isFinite(semiFutDeal) && Number.isFinite(semiFutYst)) semiFutChange = semiFutDeal - semiFutYst;
+        if (!Number.isFinite(nikkeiFutChange) && Number.isFinite(nikkeiFutDeal) && Number.isFinite(nikkeiFutYst)) nikkeiFutChange = nikkeiFutDeal - nikkeiFutYst;
 
         let taiexPct = num(tObj.changePct, tObj.change_pct, mpPick(raw,['taiex_change_pct','taiexChangePct']));
         let txPct = num(xObj.changePct, xObj.change_pct, mpPick(raw,['tx_change_pct','txChangePct']));
         let txAllPct = num(xaObj.changePct, xaObj.change_pct, mpPick(raw,['tx_all_change_pct','txAllChangePct']));
         let nasdaqFutPct = num(nfObj.changePct, nfObj.change_pct);
         let semiFutPct = num(sfObj.changePct, sfObj.change_pct);
+        let nikkeiFutPct = num(nkObj.changePct, nkObj.change_pct);
 
         if (!Number.isFinite(taiexPct) && Number.isFinite(taiexChange) && Number.isFinite(taiexYst) && taiexYst) taiexPct = taiexChange / taiexYst * 100;
         if (!Number.isFinite(txPct) && Number.isFinite(txChange) && Number.isFinite(txYst) && txYst) txPct = txChange / txYst * 100;
         if (!Number.isFinite(txAllPct) && Number.isFinite(txAllChange) && Number.isFinite(txAllYst) && txAllYst) txAllPct = txAllChange / txAllYst * 100;
         if (!Number.isFinite(nasdaqFutPct) && Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutYst) && nasdaqFutYst) nasdaqFutPct = nasdaqFutChange / nasdaqFutYst * 100;
         if (!Number.isFinite(semiFutPct) && Number.isFinite(semiFutChange) && Number.isFinite(semiFutYst) && semiFutYst) semiFutPct = semiFutChange / semiFutYst * 100;
+        if (!Number.isFinite(nikkeiFutPct) && Number.isFinite(nikkeiFutChange) && Number.isFinite(nikkeiFutYst) && nikkeiFutYst) nikkeiFutPct = nikkeiFutChange / nikkeiFutYst * 100;
 
         let basis = num(
             (raw && raw.basis && typeof raw.basis === 'object') ? raw.basis.value : raw?.basis,
@@ -3672,6 +3712,8 @@
             txAllDeal, txAllChange, txAllPct,
             nasdaqFutDeal, nasdaqFutChange, nasdaqFutPct,
             semiFutDeal, semiFutChange, semiFutPct,
+            nikkeiFutDeal, nikkeiFutChange, nikkeiFutPct,
+            nikkeiFutCode: raw.nikkeiFutCode || '', nikkeiFutSession: raw.nikkeiFutSession || '',
             basis, updatedRaw, updatedMs
         };
     }
@@ -3683,6 +3725,7 @@
         const yxc = document.getElementById('mpYuantaTxAllChange');
         const nfv = document.getElementById('mpNasdaqFutValue'), nfc = document.getElementById('mpNasdaqFutChange');
         const sfv = document.getElementById('mpSemiFutValue'), sfc = document.getElementById('mpSemiFutChange');
+        const nkv = document.getElementById('mpNikkeiFutValue'), nkc = document.getElementById('mpNikkeiFutChange');
         const tv = document.getElementById('mpTaiexValue');
         const tc = document.getElementById('mpTaiexChange');
         const xv = document.getElementById('mpTxValue');
@@ -3694,7 +3737,9 @@
         if (nfv) nfv.textContent = mpFormat(d.nasdaqFutDeal,2);
         if (nfc) nfc.textContent = Number.isFinite(d.nasdaqFutChange) ? `${d.nasdaqFutChange>=0?'+':''}${mpFormat(d.nasdaqFutChange,2)} (${d.nasdaqFutPct>=0?'+':''}${mpFormat(d.nasdaqFutPct,2)}%)` : mode;
         if (sfv) sfv.textContent = mpFormat(d.semiFutDeal,2);
+        if (nkv) nkv.textContent = mpFormat(d.nikkeiFutDeal,2);
         if (sfc) sfc.textContent = Number.isFinite(d.semiFutChange) ? `${d.semiFutChange>=0?'+':''}${mpFormat(d.semiFutChange,2)} (${d.semiFutPct>=0?'+':''}${mpFormat(d.semiFutPct,2)}%)` : mode;
+        if (nkc) nkc.textContent = Number.isFinite(d.nikkeiFutChange) ? `${d.nikkeiFutChange>=0?'+':''}${mpFormat(d.nikkeiFutChange,2)} (${d.nikkeiFutPct>=0?'+':''}${mpFormat(d.nikkeiFutPct,2)}%) · ${d.nikkeiFutSession || ''}` : mode;
         tv.textContent = mpFormat(d.taiexDeal, 2);
         tc.textContent = Number.isFinite(d.taiexChange)
             ? `${d.taiexChange >= 0 ? '+' : ''}${mpFormat(d.taiexChange, 2)}${Number.isFinite(d.taiexPct) ? ` (${d.taiexPct >= 0 ? '+' : ''}${mpFormat(d.taiexPct, 2)}%)` : ''}`
@@ -3719,11 +3764,13 @@
         if (yxv && yxc) mpSetDirection(yxv, yxc, d.txAllChange || 0);
         if (nfv && nfc) mpSetDirection(nfv,nfc,d.nasdaqFutChange||0);
         if (sfv && sfc) mpSetDirection(sfv,sfc,d.semiFutChange||0);
+        if (nkv && nkc) mpSetDirection(nkv,nkc,d.nikkeiFutChange||0);
 
         // Flash only when the actual deal price changed versus the previous 3-second poll.
         ploutosFlashMarketCard(yxv, 'txAll', d.txAllDeal);
         ploutosFlashMarketCard(nfv, 'nasdaqFut', d.nasdaqFutDeal);
         ploutosFlashMarketCard(sfv, 'semiFut', d.semiFutDeal);
+        ploutosFlashMarketCard(nkv, 'nikkeiFut', d.nikkeiFutDeal);
         ploutosFlashMarketCard(tv, 'taiex', d.taiexDeal);
         ploutosFlashMarketCard(xv, 'txFront', d.txDeal);
 
@@ -4063,8 +4110,20 @@
 
         const change = latest.close - prevClose.close;
         const changePct = (change / prevClose.close) * 100;
-        const limitUpPrice = getTaiwanDailyLimitPrice(prevClose.close, 'up', instrumentType);
-        const limitDownPrice = getTaiwanDailyLimitPrice(prevClose.close, 'down', instrumentType);
+        // PLOUTOS v2.9.1: Yuanta official daily limits have first priority.
+        // Existing Taiwan price-limit calculation is retained strictly as failover
+        // for static/offline data or when Yuanta does not provide a valid value.
+        const yuantaUpStopPrice = Number(data.yuantaUpStopPrice);
+        const yuantaDownStopPrice = Number(data.yuantaDownStopPrice);
+        const hasYuantaUpStop = source === 'YUANTA_LIVE' && Number.isFinite(yuantaUpStopPrice) && yuantaUpStopPrice > 0;
+        const hasYuantaDownStop = source === 'YUANTA_LIVE' && Number.isFinite(yuantaDownStopPrice) && yuantaDownStopPrice > 0;
+        const limitUpPrice = hasYuantaUpStop
+            ? yuantaUpStopPrice
+            : getTaiwanDailyLimitPrice(prevClose.close, 'up', instrumentType);
+        const limitDownPrice = hasYuantaDownStop
+            ? yuantaDownStopPrice
+            : getTaiwanDailyLimitPrice(prevClose.close, 'down', instrumentType);
+        const limitPriceSource = (hasYuantaUpStop && hasYuantaDownStop) ? 'YUANTA' : 'FALLBACK';
         const tick = getTaiwanTickSize(latest.close, instrumentType);
         const tolerance = Math.max(1e-9, tick / 1000);
 
@@ -4095,7 +4154,7 @@
             badgeEl.setAttribute('role', 'button');
             badgeEl.setAttribute('tabindex', '0');
             badgeEl.setAttribute('aria-label', '播放 PLOUTOS 漲停勝利音效');
-            badgeEl.title = '點擊播放漲停勝利音效';
+            badgeEl.title = `漲停價 ${formatTaiwanMarketPrice(limitUpPrice, instrumentType)}｜判定來源：${limitPriceSource === 'YUANTA' ? '元大官方' : '公式備援'}｜點擊播放漲停勝利音效`;
             badgeEl.onclick = () => playPloutosLimitUpVictory(badgeEl);
             badgeEl.onkeydown = (ev) => {
                 if (ev.key === 'Enter' || ev.key === ' ') {
@@ -4110,7 +4169,7 @@
             badgeEl.setAttribute('role', 'button');
             badgeEl.setAttribute('tabindex', '0');
             badgeEl.setAttribute('aria-label', '播放 PLOUTOS 跌停 Hallelujah 音效');
-            badgeEl.title = '點擊播放跌停 Hallelujah 音效';
+            badgeEl.title = `跌停價 ${formatTaiwanMarketPrice(limitDownPrice, instrumentType)}｜判定來源：${limitPriceSource === 'YUANTA' ? '元大官方' : '公式備援'}｜點擊播放跌停 Hallelujah 音效`;
             badgeEl.onclick = () => playPloutosLimitDownSound(badgeEl);
             badgeEl.onkeydown = (ev) => {
                 if (ev.key === 'Enter' || ev.key === ' ') {
