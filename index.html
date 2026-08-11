@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.15 GLOBAL-MACRO-SAFE-MERGE | Yuanta LIVE → per-card official online → static DB -->
+<!-- PLOUTOS GitHub Release: v2.9.16 ICE-DXY-OFFICIAL-FALLBACK | Yuanta LIVE → per-card official cache → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -4107,7 +4107,7 @@
        Each Taiwan card selects its own best source independently.
        ============================================================ */
     const PLOUTOS_OFFICIAL_CACHE_TTL_MS = 60 * 1000;
-    let ploutosOfficialCache = { taiex:null, tx:null, jpx:null, gold:null };
+    let ploutosOfficialCache = { taiex:null, tx:null, jpx:null, gold:null, dxy:null };
 
     function mpoNum(v) {
         if (v === null || v === undefined) return null;
@@ -4347,6 +4347,54 @@
         };
         ploutosOfficialCache.gold={savedAt:Date.now(),data};
         return data;
+    }
+
+    async function mpoFetchDxy() {
+        const c=ploutosOfficialCache.dxy;
+        if(c && Date.now()-c.savedAt<PLOUTOS_OFFICIAL_CACHE_TTL_MS) return c.data;
+
+        const urls=['./ice-dxy-latest.json','ice-dxy-latest.json'];
+        let raw=null;
+        for(const url of urls){
+            try{
+                const r=await fetch(`${url}?_=${Date.now()}`, {cache:'no-store'});
+                if(!r.ok) continue;
+                raw=await r.json();
+                if(raw) break;
+            }catch(e){}
+        }
+        if(!raw) return null;
+
+        const root=(raw.dxy && typeof raw.dxy==='object') ? raw.dxy
+            : (raw.data && typeof raw.data==='object') ? raw.data
+            : raw;
+        const deal=mpoNum(root.closePrice ?? root.close ?? root.price ?? root.deal ?? root.last);
+        if(!Number.isFinite(deal)) return null;
+
+        const data={
+            deal,
+            contract:String(root.contractCode ?? root.contract ?? root.symbol ?? 'DX'),
+            contractMonth:String(root.contractMonth ?? root.month ?? ''),
+            tradingDate:String(root.dataDate ?? root.tradingDate ?? root.date ?? ''),
+            reportPublishDate:String(root.reportPublishDate ?? ''),
+            generatedAtUtc:root.generatedAt ?? root.generatedAtUtc ?? root.updatedAt ?? null,
+            source:String(root.source ?? 'ICE OFFICIAL CLOSE')
+        };
+        ploutosOfficialCache.dxy={savedAt:Date.now(),data};
+        return data;
+    }
+
+    function mpoRenderDxyFallback(dxy) {
+        if(!dxy || !Number.isFinite(dxy.deal)) return false;
+        const v=document.getElementById('mpUsdIndexValue');
+        const c=document.getElementById('mpUsdIndexChange');
+        if(!v || !c) return false;
+
+        v.textContent=mpFormat(dxy.deal,3);
+        v.className='value neutral';
+        c.className='sub neutral';
+        c.textContent=`ICE OFFICIAL CLOSE${dxy.contractMonth?` ${dxy.contractMonth}`:''}${dxy.tradingDate?` · ${dxy.tradingDate}`:''}`;
+        return true;
     }
 
     function mpoRenderGoldFallback(gold) {
@@ -4632,15 +4680,17 @@
         const staticData = staticReady ? mpoGetStaticSnapshot() : null;
 
         // 3) Fetch TAIEX and TX official data independently.
-        const [officialTaiex, officialTx, officialJpx, officialGold] = await Promise.all([
+        const [officialTaiex, officialTx, officialJpx, officialGold, officialDxy] = await Promise.all([
             mpoFetchTaiex().catch(e => { console.warn('TAIEX official unavailable',e); return null; }),
             mpoFetchTx().catch(e => { console.warn('TX official unavailable',e); return null; }),
             mpoFetchJpx().catch(e => { console.warn('JPX official unavailable',e); return null; }),
-            mpoFetchGold().catch(e => { console.warn('CME Gold official unavailable',e); return null; })
+            mpoFetchGold().catch(e => { console.warn('CME Gold official unavailable',e); return null; }),
+            mpoFetchDxy().catch(e => { console.warn('ICE DXY official unavailable',e); return null; })
         ]);
 
         if (officialJpx) mpoRenderJpxFallback(officialJpx);
         if (officialGold) mpoRenderGoldFallback(officialGold);
+        if (officialDxy) mpoRenderDxyFallback(officialDxy);
 
         // If either official Taiwan source succeeds, render ONCE using official + static fallback.
         if (officialTaiex || officialTx) {
@@ -4648,6 +4698,7 @@
                 const src=document.getElementById('mpSourceText');
                 if(src && officialJpx) src.textContent += '｜JP NIKKEI JPX OFFICIAL CACHE';
                 if(src && officialGold) src.textContent += '｜GOLD CME OFFICIAL SETTLEMENT';
+                if(src && officialDxy) src.textContent += '｜DXY ICE OFFICIAL CLOSE';
                 return false;
             }
         }
@@ -4656,11 +4707,14 @@
         if (staticReady) {
             refreshMarketPulseStatic();
             if(officialJpx) mpoRenderJpxFallback(officialJpx);
+            if(officialGold) mpoRenderGoldFallback(officialGold);
+            if(officialDxy) mpoRenderDxyFallback(officialDxy);
             const status=document.getElementById('marketPulseStatus');
             const src=document.getElementById('mpSourceText');
             if(status) status.textContent=`🟡 YUANTA + OFFICIAL ONLINE OFFLINE｜已切換 STATIC MARKET DB｜${status.textContent.replace(/^✅\s*/,'')}`;
             if(src && officialJpx) src.textContent += '｜JP NIKKEI JPX OFFICIAL CACHE';
             if(src && officialGold) src.textContent += '｜GOLD CME OFFICIAL SETTLEMENT';
+            if(src && officialDxy) src.textContent += '｜DXY ICE OFFICIAL CLOSE';
             return false;
         }
 
