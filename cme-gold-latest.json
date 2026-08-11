@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ploutos-cme-gold-cache-v1",
+  "market": "CME",
+  "exchange": "COMEX",
+  "symbol": "GC",
+  "name": "Gold Futures",
+  "productId": 437,
+  "contractMonth": "202608",
+  "contractLabel": "AUG 26",
+  "contractCode": "GC2608",
+  "settlementPrice": 4361.8,
+  "tradeDate": "2026-08-10",
+  "officialTradeDate": "08/10/2026",
+  "previousSettlementPrice": null,
+  "source": "CME Group Official Settlement",
+  "sourcePage": "https://www.cmegroup.com/markets/metals/precious/gold.settlements.html",
+  "generatedAt": "2026-08-11T16:32:49.887467+00:00",
+  "open": 4336.1,
+  "high": 4390.1,
+  "low": 4336.1,
+  "volume": 1303.0,
+  "openInterest": 1918.0
+}
