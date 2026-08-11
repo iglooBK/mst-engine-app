@@ -95,38 +95,12 @@ for o in rows:
 
 if not parsed:
     print("ERROR: TAIFEX returned no usable outright monthly TX rows.", file=sys.stderr)
-
     if isinstance(rows, list) and rows:
-        # Diagnostic 1: list all distinct contract codes seen.
-        contracts = []
-        seen = set()
-        for o in rows:
-            if not isinstance(o, dict):
-                continue
-            c = str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
-            if c and c not in seen:
-                seen.add(c)
-                contracts.append(c)
-
-        print("TAIFEX CONTRACTS FOUND:", ", ".join(contracts[:200]), file=sys.stderr)
-
-        # Diagnostic 2: print rows whose contract code/name contains TX.
-        tx_like = []
-        for o in rows:
-            if not isinstance(o, dict):
-                continue
-            c = str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
-            if "TX" in c:
-                tx_like.append(o)
-
-        print(f"TX-LIKE ROW COUNT: {len(tx_like)}", file=sys.stderr)
-        for i, row in enumerate(tx_like[:10], 1):
-            print(f"TX-LIKE SAMPLE #{i}: {json.dumps(row, ensure_ascii=False)}", file=sys.stderr)
-
-        # Diagnostic 3: print first 5 raw rows for schema/reference.
-        for i, row in enumerate(rows[:5], 1):
-            print(f"RAW SAMPLE #{i}: {json.dumps(row, ensure_ascii=False)}", file=sys.stderr)
-
+        contracts = sorted({
+            str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
+            for o in rows if isinstance(o, dict)
+        })
+        print("Contracts seen:", ", ".join(c for c in contracts if c)[:1000], file=sys.stderr)
     sys.exit(2)
 
 latest_date = max(x["dateKey"] for x in parsed)
