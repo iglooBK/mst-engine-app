@@ -1,0 +1,244 @@
+{
+  "status": "OK",
+  "source": "JPX Settlement Prices for Futures and Options",
+  "sourcePage": "https://www.jpx.co.jp/english/markets/derivatives/settlement-price/",
+  "csvUrl": "https://www.jpx.co.jp/english/markets/derivatives/settlement-price/tvdivq00000014l6-att/rb_e20260810.csv",
+  "generatedAtUtc": "2026-08-11T13:46:26+00:00",
+  "tradingDate": "2026-08-10",
+  "nikkei225": {
+    "issueCode": "161090018",
+    "issueName": "FUT_225_260910",
+    "product": "Nikkei 225 Futures",
+    "contractMonth": "202609",
+    "settlementPrice": 67160.0,
+    "theoreticalPrice": 67160.0,
+    "underlyingPrice": 66970.22,
+    "daysUntilMaturity": 32,
+    "underlyingName": "Nikkei 225"
+  },
+  "contracts": [
+    {
+      "issueCode": "161090018",
+      "issueName": "FUT_225_260910",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202609",
+      "settlementPrice": 67160.0,
+      "theoreticalPrice": 67160.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 32,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "161120018",
+      "issueName": "FUT_225_261210",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202612",
+      "settlementPrice": 67000.0,
+      "theoreticalPrice": 67035.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 123,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "162030018",
+      "issueName": "FUT_225_270311",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202703",
+      "settlementPrice": 67280.0,
+      "theoreticalPrice": 67279.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 214,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "162060018",
+      "issueName": "FUT_225_270610",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202706",
+      "settlementPrice": 67130.0,
+      "theoreticalPrice": 67132.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 305,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "162090018",
+      "issueName": "FUT_225_270909",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202709",
+      "settlementPrice": 67360.0,
+      "theoreticalPrice": 67408.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 396,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "162120018",
+      "issueName": "FUT_225_271209",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202712",
+      "settlementPrice": 67310.0,
+      "theoreticalPrice": 67334.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 487,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "163060018",
+      "issueName": "FUT_225_280608",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202806",
+      "settlementPrice": 67500.0,
+      "theoreticalPrice": 67500.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 669,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "163120018",
+      "issueName": "FUT_225_281207",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202812",
+      "settlementPrice": 67760.0,
+      "theoreticalPrice": 67758.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 851,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "164060018",
+      "issueName": "FUT_225_290607",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202906",
+      "settlementPrice": 68120.0,
+      "theoreticalPrice": 68119.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1033,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "164120018",
+      "issueName": "FUT_225_291213",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "202912",
+      "settlementPrice": 68520.0,
+      "theoreticalPrice": 68522.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1222,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "165060018",
+      "issueName": "FUT_225_300613",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203006",
+      "settlementPrice": 68920.0,
+      "theoreticalPrice": 68924.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1404,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "165120018",
+      "issueName": "FUT_225_301212",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203012",
+      "settlementPrice": 69390.0,
+      "theoreticalPrice": 69390.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1586,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "166060018",
+      "issueName": "FUT_225_310612",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203106",
+      "settlementPrice": 69830.0,
+      "theoreticalPrice": 69826.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1768,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "166120018",
+      "issueName": "FUT_225_311211",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203112",
+      "settlementPrice": 70310.0,
+      "theoreticalPrice": 70311.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 1950,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "167060018",
+      "issueName": "FUT_225_320610",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203206",
+      "settlementPrice": 70790.0,
+      "theoreticalPrice": 70786.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 2132,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "167120018",
+      "issueName": "FUT_225_321209",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203212",
+      "settlementPrice": 71320.0,
+      "theoreticalPrice": 71317.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 2314,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "168060018",
+      "issueName": "FUT_225_330609",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203306",
+      "settlementPrice": 71860.0,
+      "theoreticalPrice": 71863.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 2496,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "168120018",
+      "issueName": "FUT_225_331208",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203312",
+      "settlementPrice": 72240.0,
+      "theoreticalPrice": 72236.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 2678,
+      "underlyingName": "Nikkei 225"
+    },
+    {
+      "issueCode": "169060018",
+      "issueName": "FUT_225_340608",
+      "product": "Nikkei 225 Futures",
+      "contractMonth": "203406",
+      "settlementPrice": 72860.0,
+      "theoreticalPrice": 72856.0,
+      "underlyingPrice": 66970.22,
+      "daysUntilMaturity": 2860,
+      "underlyingName": "Nikkei 225"
+    }
+  ],
+  "diagnostic": {
+    "csvEncoding": "cp932",
+    "matchedStandardFutures": 19,
+    "excludedMiniPattern": "FUT_225M_*",
+    "selection": "nearest non-expired standard Nikkei 225 Futures contract"
+  },
+  "security": {
+    "containsAccount": false,
+    "containsPassword": false,
+    "containsCertificate": false,
+    "containsApiSecret": false,
+    "requiresYuantaLogin": false,
+    "tradingFunctions": false
+  }
+}
