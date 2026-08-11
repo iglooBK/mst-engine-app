@@ -4107,7 +4107,7 @@
        Each Taiwan card selects its own best source independently.
        ============================================================ */
     const PLOUTOS_OFFICIAL_CACHE_TTL_MS = 60 * 1000;
-    let ploutosOfficialCache = { taiex:null, tx:null, jpx:null };
+    let ploutosOfficialCache = { taiex:null, tx:null, jpx:null, gold:null };
 
     function mpoNum(v) {
         if (v === null || v === undefined) return null;
@@ -4298,6 +4298,73 @@
         };
         ploutosOfficialCache.jpx={savedAt:Date.now(),data};
         return data;
+    }
+
+    async function mpoFetchGold() {
+        const c=ploutosOfficialCache.gold;
+        if(c && Date.now()-c.savedAt<PLOUTOS_OFFICIAL_CACHE_TTL_MS) return c.data;
+
+        const urls=['./cme-gold-latest.json','cme-gold-latest.json'];
+        let raw=null;
+        for(const url of urls){
+            try{
+                const r=await fetch(`${url}?_=${Date.now()}`, {cache:'no-store'});
+                if(!r.ok) continue;
+                raw=await r.json();
+                if(raw) break;
+            }catch(e){}
+        }
+        if(!raw) return null;
+
+        // Accept both the current production cache and conservative aliases so
+        // a harmless backend field-name refinement will not blank the Gold card.
+        const root=(raw.gold && typeof raw.gold==='object') ? raw.gold
+            : (raw.cmeGold && typeof raw.cmeGold==='object') ? raw.cmeGold
+            : (raw.data && typeof raw.data==='object') ? raw.data
+            : raw;
+        const deal=mpoNum(
+            root.settlementPrice ?? root.settlement ?? root.settle ?? root.close ??
+            root.price ?? root.deal ?? root.last ?? raw.settlementPrice ?? raw.settlement
+        );
+        if(!Number.isFinite(deal)) return null;
+
+        const prev=mpoNum(
+            root.previousSettlement ?? root.prevSettlement ?? root.previousClose ??
+            root.prevClose ?? root.yst ?? raw.previousSettlement ?? raw.prevSettlement
+        );
+        let change=mpoNum(root.change ?? raw.change);
+        if(!Number.isFinite(change) && Number.isFinite(prev)) change=deal-prev;
+        let pct=mpoNum(root.changePct ?? root.change_pct ?? raw.changePct ?? raw.change_pct);
+        if(!Number.isFinite(pct) && Number.isFinite(change) && Number.isFinite(prev) && prev) pct=change/prev*100;
+
+        const data={
+            deal, change, pct,
+            contract:String(root.contract ?? root.symbol ?? root.contractCode ?? raw.contract ?? raw.symbol ?? 'GC'),
+            contractMonth:String(root.contractMonth ?? root.month ?? raw.contractMonth ?? raw.month ?? ''),
+            tradingDate:String(root.tradingDate ?? root.date ?? root.tradeDate ?? raw.tradingDate ?? raw.date ?? ''),
+            generatedAtUtc:raw.generatedAtUtc ?? raw.updatedAt ?? raw.generated_at ?? null,
+            source:String(raw.source ?? root.source ?? 'CME OFFICIAL SETTLEMENT')
+        };
+        ploutosOfficialCache.gold={savedAt:Date.now(),data};
+        return data;
+    }
+
+    function mpoRenderGoldFallback(gold) {
+        if(!gold || !Number.isFinite(gold.deal)) return false;
+        const v=document.getElementById('mpGoldFutValue');
+        const c=document.getElementById('mpGoldFutChange');
+        if(!v || !c) return false;
+
+        v.textContent=mpFormat(gold.deal,1);
+        if(Number.isFinite(gold.change)) {
+            c.textContent=`${gold.change>=0?'+':''}${mpFormat(gold.change,1)}${Number.isFinite(gold.pct)?` (${gold.pct>=0?'+':''}${mpFormat(gold.pct,2)}%)`:''} · CME OFFICIAL SETTLEMENT`;
+            mpSetDirection(v,c,gold.change||0);
+        } else {
+            v.className='value neutral';
+            c.className='sub neutral';
+            c.textContent=`CME OFFICIAL SETTLEMENT${gold.contractMonth?` ${gold.contractMonth}`:''}${gold.tradingDate?` · ${gold.tradingDate}`:''}`;
+        }
+        return true;
     }
 
     function mpoRenderJpxFallback(jpx) {
@@ -4565,19 +4632,22 @@
         const staticData = staticReady ? mpoGetStaticSnapshot() : null;
 
         // 3) Fetch TAIEX and TX official data independently.
-        const [officialTaiex, officialTx, officialJpx] = await Promise.all([
+        const [officialTaiex, officialTx, officialJpx, officialGold] = await Promise.all([
             mpoFetchTaiex().catch(e => { console.warn('TAIEX official unavailable',e); return null; }),
             mpoFetchTx().catch(e => { console.warn('TX official unavailable',e); return null; }),
-            mpoFetchJpx().catch(e => { console.warn('JPX official unavailable',e); return null; })
+            mpoFetchJpx().catch(e => { console.warn('JPX official unavailable',e); return null; }),
+            mpoFetchGold().catch(e => { console.warn('CME Gold official unavailable',e); return null; })
         ]);
 
         if (officialJpx) mpoRenderJpxFallback(officialJpx);
+        if (officialGold) mpoRenderGoldFallback(officialGold);
 
         // If either official Taiwan source succeeds, render ONCE using official + static fallback.
         if (officialTaiex || officialTx) {
             if (mpoRenderIndependent(officialTaiex, officialTx, staticData)) {
                 const src=document.getElementById('mpSourceText');
                 if(src && officialJpx) src.textContent += '｜JP NIKKEI JPX OFFICIAL CACHE';
+                if(src && officialGold) src.textContent += '｜GOLD CME OFFICIAL SETTLEMENT';
                 return false;
             }
         }
@@ -4590,6 +4660,7 @@
             const src=document.getElementById('mpSourceText');
             if(status) status.textContent=`🟡 YUANTA + OFFICIAL ONLINE OFFLINE｜已切換 STATIC MARKET DB｜${status.textContent.replace(/^✅\s*/,'')}`;
             if(src && officialJpx) src.textContent += '｜JP NIKKEI JPX OFFICIAL CACHE';
+            if(src && officialGold) src.textContent += '｜GOLD CME OFFICIAL SETTLEMENT';
             return false;
         }
 
