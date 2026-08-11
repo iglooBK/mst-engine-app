@@ -1,4 +1,4 @@
-name: Update TAIFEX + CME Gold Market Cache
+name: Update TAIFEX + CME Gold + ICE DXY Market Cache
 
 on:
   workflow_dispatch:
@@ -36,12 +36,18 @@ jobs:
         id: cme_gold
         continue-on-error: true
         run: python fetch-cme-gold-PRODUCTION.py
+      - name: Install ICE DXY parser dependency
+        run: python -m pip install --disable-pip-version-check xlrd==2.0.2
 
+      - name: Fetch ICE DXY official close data
+        id: ice_dxy
+        continue-on-error: true
+        run: python fetch-ice-dxy-PRODUCTION.py
       - name: Commit cache only when changed
         shell: bash
         run: |
-          if [ -z "$(git status --porcelain -- taifex-market-latest.json cme-gold-latest.json)" ]; then
-            echo "No TAIFEX / CME Gold data change."
+          if [ -z "$(git status --porcelain -- taifex-market-latest.json cme-gold-latest.json ice-dxy-latest.json)" ]; then
+            echo "No TAIFEX / CME Gold / ICE DXY data change."
             exit 0
           fi
 
@@ -50,13 +56,13 @@ jobs:
 
           [ -f taifex-market-latest.json ] && git add taifex-market-latest.json
           [ -f cme-gold-latest.json ] && git add cme-gold-latest.json
-
+          [ -f ice-dxy-latest.json ] && git add ice-dxy-latest.json
           if git diff --cached --quiet; then
             echo "No cache file staged."
             exit 0
           fi
 
-          git commit -m "chore: update TAIFEX and CME Gold market cache"
+          git commit -m "chore: update TAIFEX, CME Gold and ICE DXY market cache"
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
@@ -65,4 +71,9 @@ jobs:
         run: |
           echo "::error::CME Gold official settlement fetch failed."
           exit 1
-    
+
+      - name: Fail if ICE DXY fetch failed
+        if: steps.ice_dxy.outcome == 'failure'
+        run: |
+          echo "::error::ICE DXY official close fetch failed."
+          exit 1
