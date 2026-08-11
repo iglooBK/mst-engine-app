@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.10 NO-FLICKER-FAILOVER | Yuanta LIVE → per-card official online → static DB -->
+<!-- PLOUTOS GitHub Release: v2.9.12 TAIFEX-CACHE-BRIDGE | Yuanta LIVE → per-card official online → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -4135,52 +4135,48 @@
     async function mpoFetchTx() {
         const c=ploutosOfficialCache.tx;
         if(c && Date.now()-c.savedAt<PLOUTOS_OFFICIAL_CACHE_TTL_MS) return c.data;
-        let raw;
-        try {
-            const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),9000);
-            const r=await fetch('https://openapi.taifex.com.tw/v1/DailyMarketReportFut',{cache:'no-store',signal:ctl.signal});
-            clearTimeout(timer);
-            if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            raw=await r.json();
-        } catch(e) {
-            console.warn('Direct TAIFEX OpenAPI failed; trying CORS fallback',e);
-            try { raw=await fetchJsonWithCorsFallback('https://openapi.taifex.com.tw/v1/DailyMarketReportFut',12000); }
-            catch(e2){ console.warn('TAIFEX fallback failed',e2); return null; }
+
+        // v2.9.12:
+        // Browser no longer calls TAIFEX OpenAPI directly (CORS blocked on GitHub Pages).
+        // GitHub Actions fetches TAIFEX server-side and commits this compact cache JSON.
+        const urls = [
+            './taifex-market-latest.json',
+            'taifex-market-latest.json'
+        ];
+
+        let raw = null;
+        for (const url of urls) {
+            try {
+                const r = await fetch(`${url}?_=${Date.now()}`, {cache:'no-store'});
+                if (!r.ok) continue;
+                raw = await r.json();
+                if (raw) break;
+            } catch (e) {}
         }
-        const rows=Array.isArray(raw)?raw:(Array.isArray(raw?.data)?raw.data:[]);
-        let p=rows.map(o=>{
-            const contract=String(mpoField(o,['Contract','契約','商品代號'],['contract','契約'])||'').trim().toUpperCase();
-            const month=String(mpoField(o,['ContractMonth','到期月份(週別)','到期月份'],['contractmonth','到期月份'])||'').trim();
-            const date=mpoField(o,['Date','交易日期','日期'],['date','交易日期']);
-            const close=mpoNum(mpoField(o,['ClosingPrice','最後成交價','收盤價','Close'],['closingprice','最後成交價','收盤價']));
-            const change=mpoNum(mpoField(o,['Change','漲跌價'],['change','漲跌價']));
-            const pct=mpoNum(mpoField(o,['ChangePercent','漲跌%','漲跌％'],['changepercent','漲跌%','漲跌％']));
-            const session=String(mpoField(o,['TradingSession','交易時段','Session'],['tradingsession','交易時段'])||'').trim();
-            return {contract,month,date:String(date||''),dateKey:mpoDateKey(date),close,change,pct,session};
-        }).filter(x=>{
-            const c=x.contract.replace(/\s/g,'');
-            return (c==='TX'||c.startsWith('TX')||c.includes('臺股期貨')||c.includes('台股期貨'))
-                && x.dateKey && Number.isFinite(x.close) && /(\d{6})/.test(x.month);
-        });
-        if(!p.length) return null;
-        const latestDate=p.reduce((m,x)=>x.dateKey>m?x.dateKey:m,'');
-        p=p.filter(x=>x.dateKey===latestDate);
-        const rank=x=>Number((String(x.month).match(/(\d{6})/)||['','999999'])[1]);
-        const nearest=Math.min(...p.map(rank));
-        p=p.filter(x=>rank(x)===nearest);
-        const sk=s=>{
-            s=String(s||'').toLowerCase();
-            if(s.includes('盤後')||s.includes('after')||s.includes('夜')) return 'AH';
-            if(s.includes('一般')||s.includes('regular')||s.includes('日')) return 'REG';
-            return 'UNK';
+        if (!raw) return null;
+
+        const normalize = x => {
+            if (!x || !Number.isFinite(Number(x.close))) return null;
+            return {
+                contract: String(x.contract || 'TX'),
+                month: String(x.contractMonth || ''),
+                date: String(x.date || ''),
+                dateKey: String(x.dateKey || ''),
+                close: Number(x.close),
+                change: Number.isFinite(Number(x.change)) ? Number(x.change) : null,
+                pct: Number.isFinite(Number(x.changePct)) ? Number(x.changePct) : null,
+                session: String(x.session || '')
+            };
         };
-        const front=p.find(x=>sk(x.session)==='REG')||p[0];
-        const all=p.find(x=>sk(x.session)==='AH')||front;
-        const data={front,all};
-        ploutosOfficialCache.tx={savedAt:Date.now(),data};
+
+        const front = normalize(raw.front);
+        const all = normalize(raw.all);
+        if (!front) return null;
+
+        const data = {front, all};
+        ploutosOfficialCache.tx={savedAt:Date.now(), data};
         return data;
     }
-
 
     function mpoGetStaticSnapshot() {
         if (typeof MARKET_DATA === 'undefined' || !MARKET_DATA) return null;
@@ -4278,7 +4274,7 @@
 
         const status=document.getElementById('marketPulseStatus'),src=document.getElementById('mpSourceText');
         const ts=taiex?'TWSE OFFICIAL':'STATIC DB';
-        const xs=tx?'TAIFEX OFFICIAL':'STATIC DB';
+        const xs=tx?'TAIFEX OFFICIAL CACHE':'STATIC DB';
         if(status) status.textContent=`🌐 YUANTA OFFLINE｜TAIEX ${ts}${taiex?.date?` ${taiex.date}`:''}｜TX ${xs}${tx?.front?.date?` ${tx.front.date} ${tx.front.month}`:''}`;
         if(src) src.textContent=`DATA SOURCE ｜TAIEX ${ts}｜TX FRONT/ALL ${xs}｜BASIS CALC｜非即時`;
         return true;
