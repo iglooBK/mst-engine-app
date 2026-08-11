@@ -1,0 +1,47 @@
+name: Update TAIFEX Market Cache
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Taiwan time; multiple post-close attempts handle official publication delay.
+    - cron: '20,50 5 * * 1-5'
+      timezone: 'Asia/Taipei'
+    - cron: '20,50 14 * * 1-5'
+      timezone: 'Asia/Taipei'
+    - cron: '20 15 * * 1-5'
+      timezone: 'Asia/Taipei'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: taifex-market-cache
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Fetch TAIFEX official market data
+        run: python fetch-taifex-market.py
+
+      - name: Commit cache only when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- taifex-market-latest.json; then
+            echo "No TAIFEX data change."
+            exit 0
+          fi
+          git config user.name "PLOUTOS Market Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add taifex-market-latest.json
+          git commit -m "chore: update TAIFEX market cache"
+          git push
