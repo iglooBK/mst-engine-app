@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.14 US-OFFICIAL-CACHE-INTEGRATION | Yuanta LIVE → per-card official online → static DB -->
+<!-- PLOUTOS GitHub Release: v2.9.15 GLOBAL-MACRO-SAFE-MERGE | Yuanta LIVE → per-card official online → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -2258,6 +2258,31 @@
             }
         }
 
+
+        /* PLOUTOS v2.9.15 — SAFE LAYOUT MERGE
+           Japan / USD Index / Gold use three equal cards on the same row. */
+        .market-region.jp-region .market-region-grid.jp-macro-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: 1fr;
+            justify-content: stretch;
+        }
+        .jp-macro-grid .market-pulse-item {
+            width: auto;
+            min-width: 0;
+            max-width: none;
+        }
+        @media (max-width: 900px) and (min-width: 761px) {
+            .market-region.jp-region .market-region-grid.jp-macro-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-template-rows: 1fr;
+            }
+        }
+        @media (max-width: 760px) {
+            .market-region.jp-region .market-region-grid.jp-macro-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+        }
 </style>
 </head>
 <body>
@@ -2397,16 +2422,28 @@
                     </div>
                 </section>
 
-                <section class="market-region jp-region" aria-label="Japan Market">
+                <section class="market-region jp-region jp-macro-region" aria-label="Japan Market and Global Macro">
                     <div class="market-region-title">
                         <span><b class="region-code">JP</b> JAPAN MARKET // 日本市場</span>
-                        <span class="region-live-hint">OSE・JPX</span>
+                        <span class="region-live-hint">OSE・JPX ｜ GLOBAL MACRO // DXY・COMEX GOLD</span>
                     </div>
-                    <div class="market-region-grid">
+                    <div class="market-region-grid jp-macro-grid">
                         <div class="market-pulse-item market-us" data-market-group="JP">
                             <label>NIKKEI 225 FUT // 大阪日經期貨</label>
                             <div class="value neutral" id="mpNikkeiFutValue">--</div>
                             <div class="sub neutral" id="mpNikkeiFutChange">等待元大 LIVE</div>
+                        </div>
+
+                        <div class="market-pulse-item market-us" data-market-group="MACRO">
+                            <label>US DOLLAR INDEX // 美元指數</label>
+                            <div class="value neutral" id="mpUsdIndexValue">--</div>
+                            <div class="sub neutral" id="mpUsdIndexChange">等待元大 LIVE</div>
+                        </div>
+
+                        <div class="market-pulse-item market-us" data-market-group="MACRO">
+                            <label>GOLD FUTURES // COMEX 黃金期貨</label>
+                            <div class="value neutral" id="mpGoldFutValue">--</div>
+                            <div class="sub neutral" id="mpGoldFutChange">等待元大 LIVE</div>
                         </div>
                     </div>
                 </section>
@@ -3855,6 +3892,8 @@
         const nasdaqFut = mpPick(raw, ['nasdaqFut','nasdaq_fut','market.nasdaqFut','data.nasdaqFut']);
         const semiFut = mpPick(raw, ['semiFut','semi_fut','SXFPMI6','market.semiFut','data.semiFut']);
         const nikkeiFut = mpPick(raw, ['nikkeiFut','nikkei_fut','market.nikkeiFut','data.nikkeiFut']);
+        const usdIndex = mpPick(raw, ['usdIndex','usd_index','globalMacro.usdIndex','market.usdIndex','data.usdIndex']);
+        const goldFut = mpPick(raw, ['goldFut','gold_fut','globalMacro.goldFut','market.goldFut','data.goldFut']);
         const updatedRaw = mpPick(raw, ['updatedAt','updated_at','timestamp','time','generatedAt','meta.updatedAt']);
         const updatedMs = updatedRaw ? Date.parse(updatedRaw) : NaN;
 
@@ -3877,6 +3916,8 @@
         const nfObj = (nasdaqFut && typeof nasdaqFut === 'object') ? nasdaqFut : {};
         const sfObj = (semiFut && typeof semiFut === 'object') ? semiFut : {};
         const nkObj = (nikkeiFut && typeof nikkeiFut === 'object') ? nikkeiFut : {};
+        const uxObj = (usdIndex && typeof usdIndex === 'object') ? usdIndex : {};
+        const gfObj = (goldFut && typeof goldFut === 'object') ? goldFut : {};
 
         const taiexDeal = num(tObj.deal, tObj.close, tObj.price, tObj.last, mpPick(raw,['taiex_deal','taiexDeal']));
         const taiexYst = num(tObj.yst, tObj.yesterday, tObj.prevClose, tObj.previousClose, mpPick(raw,['taiex_yst','taiexYst']));
@@ -3891,6 +3932,10 @@
         const nikkeiFutDeal = num(nkObj.deal, nkObj.close, nkObj.price, nkObj.last);
         const semiFutYst = num(sfObj.yst, sfObj.yesterday, sfObj.prevClose, sfObj.previousClose);
         const nikkeiFutYst = num(nkObj.yst, nkObj.yesterday, nkObj.prevClose, nkObj.previousClose);
+        const usdIndexDeal = num(uxObj.deal, uxObj.close, uxObj.price, uxObj.last);
+        const usdIndexYst = num(uxObj.yst, uxObj.yesterday, uxObj.prevClose, uxObj.previousClose);
+        const goldFutDeal = num(gfObj.deal, gfObj.close, gfObj.price, gfObj.last);
+        const goldFutYst = num(gfObj.yst, gfObj.yesterday, gfObj.prevClose, gfObj.previousClose);
 
         let taiexChange = num(tObj.change, mpPick(raw,['taiex_change','taiexChange']));
         let txChange = num(xObj.change, mpPick(raw,['tx_change','txChange']));
@@ -3899,6 +3944,8 @@
         let semiFutChange = num(sfObj.change);
         if (!Number.isFinite(semiFutDeal)) semiFutChange = null;
         let nikkeiFutChange = num(nkObj.change);
+        let usdIndexChange = num(uxObj.change);
+        let goldFutChange = num(gfObj.change);
 
         if (!Number.isFinite(taiexChange) && Number.isFinite(taiexDeal) && Number.isFinite(taiexYst)) taiexChange = taiexDeal - taiexYst;
         if (!Number.isFinite(txChange) && Number.isFinite(txDeal) && Number.isFinite(txYst)) txChange = txDeal - txYst;
@@ -3906,6 +3953,8 @@
         if (!Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutDeal) && Number.isFinite(nasdaqFutYst)) nasdaqFutChange = nasdaqFutDeal - nasdaqFutYst;
         if (!Number.isFinite(semiFutChange) && Number.isFinite(semiFutDeal) && Number.isFinite(semiFutYst)) semiFutChange = semiFutDeal - semiFutYst;
         if (!Number.isFinite(nikkeiFutChange) && Number.isFinite(nikkeiFutDeal) && Number.isFinite(nikkeiFutYst)) nikkeiFutChange = nikkeiFutDeal - nikkeiFutYst;
+        if (!Number.isFinite(usdIndexChange) && Number.isFinite(usdIndexDeal) && Number.isFinite(usdIndexYst)) usdIndexChange = usdIndexDeal - usdIndexYst;
+        if (!Number.isFinite(goldFutChange) && Number.isFinite(goldFutDeal) && Number.isFinite(goldFutYst)) goldFutChange = goldFutDeal - goldFutYst;
 
         let taiexPct = num(tObj.changePct, tObj.change_pct, mpPick(raw,['taiex_change_pct','taiexChangePct']));
         let txPct = num(xObj.changePct, xObj.change_pct, mpPick(raw,['tx_change_pct','txChangePct']));
@@ -3914,6 +3963,8 @@
         let semiFutPct = num(sfObj.changePct, sfObj.change_pct);
         if (!Number.isFinite(semiFutDeal)) semiFutPct = null;
         let nikkeiFutPct = num(nkObj.changePct, nkObj.change_pct);
+        let usdIndexPct = num(uxObj.changePct, uxObj.change_pct);
+        let goldFutPct = num(gfObj.changePct, gfObj.change_pct);
 
         if (!Number.isFinite(taiexPct) && Number.isFinite(taiexChange) && Number.isFinite(taiexYst) && taiexYst) taiexPct = taiexChange / taiexYst * 100;
         if (!Number.isFinite(txPct) && Number.isFinite(txChange) && Number.isFinite(txYst) && txYst) txPct = txChange / txYst * 100;
@@ -3921,6 +3972,8 @@
         if (!Number.isFinite(nasdaqFutPct) && Number.isFinite(nasdaqFutChange) && Number.isFinite(nasdaqFutYst) && nasdaqFutYst) nasdaqFutPct = nasdaqFutChange / nasdaqFutYst * 100;
         if (!Number.isFinite(semiFutPct) && Number.isFinite(semiFutChange) && Number.isFinite(semiFutYst) && semiFutYst) semiFutPct = semiFutChange / semiFutYst * 100;
         if (!Number.isFinite(nikkeiFutPct) && Number.isFinite(nikkeiFutChange) && Number.isFinite(nikkeiFutYst) && nikkeiFutYst) nikkeiFutPct = nikkeiFutChange / nikkeiFutYst * 100;
+        if (!Number.isFinite(usdIndexPct) && Number.isFinite(usdIndexChange) && Number.isFinite(usdIndexYst) && usdIndexYst) usdIndexPct = usdIndexChange / usdIndexYst * 100;
+        if (!Number.isFinite(goldFutPct) && Number.isFinite(goldFutChange) && Number.isFinite(goldFutYst) && goldFutYst) goldFutPct = goldFutChange / goldFutYst * 100;
 
         let basis = num(
             (raw && raw.basis && typeof raw.basis === 'object') ? raw.basis.value : raw?.basis,
@@ -3937,6 +3990,10 @@
             semiFutCode: raw.semiFutCode || '', semiFutSession: raw.semiFutSession || '',
             nikkeiFutDeal, nikkeiFutChange, nikkeiFutPct,
             nikkeiFutCode: raw.nikkeiFutCode || '', nikkeiFutSession: raw.nikkeiFutSession || '',
+            usdIndexDeal, usdIndexChange, usdIndexPct,
+            usdIndexCode: raw.usdIndexCode || 'DOLINDX2609',
+            goldFutDeal, goldFutChange, goldFutPct,
+            goldFutCode: raw.goldFutCode || 'GC2608',
             basis, updatedRaw, updatedMs
         };
     }
@@ -3949,6 +4006,8 @@
         const nfv = document.getElementById('mpNasdaqFutValue'), nfc = document.getElementById('mpNasdaqFutChange');
         const sfv = document.getElementById('mpSemiFutValue'), sfc = document.getElementById('mpSemiFutChange');
         const nkv = document.getElementById('mpNikkeiFutValue'), nkc = document.getElementById('mpNikkeiFutChange');
+        const uxv = document.getElementById('mpUsdIndexValue'), uxc = document.getElementById('mpUsdIndexChange');
+        const gfv = document.getElementById('mpGoldFutValue'), gfc = document.getElementById('mpGoldFutChange');
         const tv = document.getElementById('mpTaiexValue');
         const tc = document.getElementById('mpTaiexChange');
         const xv = document.getElementById('mpTxValue');
@@ -3963,6 +4022,17 @@
         if (nkv) nkv.textContent = mpFormat(d.nikkeiFutDeal,2);
         if (sfc) sfc.textContent = Number.isFinite(d.semiFutChange) ? `${d.semiFutChange>=0?'+':''}${mpFormat(d.semiFutChange,2)} (${d.semiFutPct>=0?'+':''}${mpFormat(d.semiFutPct,2)}%) · ${d.semiFutSession || ''}` : '等待有效成交';
         if (nkc) nkc.textContent = Number.isFinite(d.nikkeiFutChange) ? `${d.nikkeiFutChange>=0?'+':''}${mpFormat(d.nikkeiFutChange,2)} (${d.nikkeiFutPct>=0?'+':''}${mpFormat(d.nikkeiFutPct,2)}%) · ${d.nikkeiFutSession || ''}` : mode;
+
+        if (uxv) uxv.textContent = mpFormat(d.usdIndexDeal,3);
+        if (uxc) uxc.textContent = Number.isFinite(d.usdIndexChange)
+            ? `${d.usdIndexChange>=0?'+':''}${mpFormat(d.usdIndexChange,3)} (${d.usdIndexPct>=0?'+':''}${mpFormat(d.usdIndexPct,2)}%) · YUANTA LIVE`
+            : '等待元大 LIVE';
+
+        if (gfv) gfv.textContent = mpFormat(d.goldFutDeal,1);
+        if (gfc) gfc.textContent = Number.isFinite(d.goldFutChange)
+            ? `${d.goldFutChange>=0?'+':''}${mpFormat(d.goldFutChange,1)} (${d.goldFutPct>=0?'+':''}${mpFormat(d.goldFutPct,2)}%) · YUANTA LIVE`
+            : '等待元大 LIVE';
+
         tv.textContent = mpFormat(d.taiexDeal, 2);
         tc.textContent = Number.isFinite(d.taiexChange)
             ? `${d.taiexChange >= 0 ? '+' : ''}${mpFormat(d.taiexChange, 2)}${Number.isFinite(d.taiexPct) ? ` (${d.taiexPct >= 0 ? '+' : ''}${mpFormat(d.taiexPct, 2)}%)` : ''}`
@@ -3988,12 +4058,16 @@
         if (nfv && nfc) mpSetDirection(nfv,nfc,d.nasdaqFutChange||0);
         if (sfv && sfc) mpSetDirection(sfv,sfc,d.semiFutChange||0);
         if (nkv && nkc) mpSetDirection(nkv,nkc,d.nikkeiFutChange||0);
+        if (uxv && uxc) mpSetDirection(uxv,uxc,d.usdIndexChange||0);
+        if (gfv && gfc) mpSetDirection(gfv,gfc,d.goldFutChange||0);
 
         // Flash only when the actual deal price changed versus the previous 3-second poll.
         ploutosFlashMarketCard(yxv, 'txAll', d.txAllDeal);
         ploutosFlashMarketCard(nfv, 'nasdaqFut', d.nasdaqFutDeal);
         ploutosFlashMarketCard(sfv, 'semiFut', d.semiFutDeal);
         ploutosFlashMarketCard(nkv, 'nikkeiFut', d.nikkeiFutDeal);
+        ploutosFlashMarketCard(uxv, 'usdIndex', d.usdIndexDeal);
+        ploutosFlashMarketCard(gfv, 'goldFut', d.goldFutDeal);
         ploutosFlashMarketCard(tv, 'taiex', d.taiexDeal);
         ploutosFlashMarketCard(xv, 'txFront', d.txDeal);
 
@@ -4019,7 +4093,7 @@
 
         if (mode === 'LIVE') {
             if (status) status.textContent = `🟢 YUANTA LIVE｜${stamp}｜3 秒自動刷新`;
-            if (src) src.textContent = `DATA SOURCE ｜YUANTA SPARK API PROD // NQ_2609 + SXFPMI6 // QUOTE-ONLY // ${sourceUrl.includes('127.0.0.1') ? 'LOCAL BRIDGE' : 'LOCAL JSON'}`;
+            if (src) src.textContent = `DATA SOURCE ｜YUANTA SPARK API PROD // NQ_2609 + SXFPMI6 + DOLINDX2609 + GC2608 // QUOTE-ONLY // ${sourceUrl.includes('127.0.0.1') ? 'LOCAL BRIDGE' : 'LOCAL JSON'}`;
         } else {
             if (status) status.textContent = `🟠 YUANTA STALE｜最後行情 ${stamp}｜STATIC DB 未載入`;
             if (src) src.textContent = 'DATA SOURCE ｜LAST YUANTA QUOTE // LOCAL ONLY // STALE';
