@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.12 TAIFEX-CACHE-BRIDGE | Yuanta LIVE → per-card official online → static DB -->
+<!-- PLOUTOS GitHub Release: v2.9.13 OFFICIAL-CACHE-INTEGRATION | Yuanta LIVE → per-card official online → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -4173,7 +4173,12 @@
         const all = normalize(raw.all);
         if (!front) return null;
 
-        const data = {front, all};
+        const data = {
+            front,
+            all,
+            cacheGeneratedAtUtc: raw.generatedAtUtc || null,
+            cacheSource: raw.source || 'TAIFEX DailyMarketReportFut'
+        };
         ploutosOfficialCache.tx={savedAt:Date.now(), data};
         return data;
     }
@@ -4233,6 +4238,7 @@
         const taiexDeal=pickNum(taiex?.deal,staticData?.taiexDeal);
         const txDeal=pickNum(tx?.front?.close,staticData?.txDeal);
         const txAllDeal=pickNum(tx?.all?.close,staticData?.txAllDeal);
+
         if(!Number.isFinite(taiexDeal) && !Number.isFinite(txDeal)) return false;
 
         const tv=document.getElementById('mpTaiexValue'),tc=document.getElementById('mpTaiexChange');
@@ -4244,39 +4250,88 @@
             if(tv) tv.textContent=mpFormat(taiexDeal,2);
             const ch=Number.isFinite(taiex?.change)?taiex.change:staticData?.taiexChange;
             const pc=Number.isFinite(taiex?.pct)?taiex.pct:staticData?.taiexPct;
-            if(tc) tc.textContent=Number.isFinite(ch)?`${ch>=0?'+':''}${mpFormat(ch,2)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`:'OFFICIAL CLOSE';
+            if(tc) tc.textContent=Number.isFinite(ch)
+                ? `${ch>=0?'+':''}${mpFormat(ch,2)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`
+                : 'OFFICIAL CLOSE';
             if(tv&&tc) mpSetDirection(tv,tc,ch||0);
         }
+
         if(Number.isFinite(txDeal)){
             if(xv) xv.textContent=mpFormat(txDeal,0);
             const ch=Number.isFinite(tx?.front?.change)?tx.front.change:staticData?.txChange;
             const pc=Number.isFinite(tx?.front?.pct)?tx.front.pct:staticData?.txPct;
-            if(xc) xc.textContent=Number.isFinite(ch)?`${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`:'LATEST OFFICIAL';
+            if(xc) xc.textContent=Number.isFinite(ch)
+                ? `${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`
+                : 'LATEST OFFICIAL';
             if(xv&&xc) mpSetDirection(xv,xc,ch||0);
         }
+
         if(Number.isFinite(txAllDeal)){
             if(av) av.textContent=mpFormat(txAllDeal,0);
             const ch=Number.isFinite(tx?.all?.change)?tx.all.change:staticData?.txAllChange;
             const pc=Number.isFinite(tx?.all?.pct)?tx.all.pct:staticData?.txAllPct;
-            if(ac) ac.textContent=Number.isFinite(ch)?`${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`:'LATEST SESSION';
+            if(ac) ac.textContent=Number.isFinite(ch)
+                ? `${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''}`
+                : 'LATEST OFFICIAL SESSION';
             if(av&&ac) mpSetDirection(av,ac,ch||0);
+        } else {
+            if(av) av.textContent='--';
+            if(ac) ac.textContent=tx ? 'TAIFEX 無盤後資料' : '等待元大 LIVE';
         }
 
-        if(Number.isFinite(taiexDeal)&&Number.isFinite(txDeal)&&bv&&bl&&bb){
-            const basis=txDeal-taiexDeal;
+        // BASIS safety:
+        // Never mix TAIEX 2026/08/11 with TX 2026/08/10 and call it a "current" basis.
+        const taiexDateKey = taiex?.dateKey || null;
+        const txDateKey = tx?.front?.dateKey || null;
+        const bothOfficial = !!taiex && !!tx?.front;
+        const sameOfficialDate = bothOfficial && taiexDateKey && txDateKey && taiexDateKey === txDateKey;
+
+        if(bv && bl && bb){
             bb.classList.remove('positive','negative');
-            bv.textContent=`${basis>=0?'+':''}${mpFormat(basis,2)}`;
-            const cls=basis>0?'up':basis<0?'down':'neutral';
-            bv.className=`value ${cls}`; bl.className=`sub ${cls}`;
-            bl.textContent=basis>0?'正價差 // FUTURES PREMIUM':basis<0?'逆價差 // FUTURES DISCOUNT':'平價差 // PARITY';
-            if(basis>0) bb.classList.add('positive'); else if(basis<0) bb.classList.add('negative');
+
+            if(Number.isFinite(taiexDeal) && Number.isFinite(txDeal) && (!bothOfficial || sameOfficialDate)){
+                const basis=txDeal-taiexDeal;
+                bv.textContent=`${basis>=0?'+':''}${mpFormat(basis,2)}`;
+                const cls=basis>0?'up':basis<0?'down':'neutral';
+                bv.className=`value ${cls}`;
+                bl.className=`sub ${cls}`;
+                bl.textContent=basis>0
+                    ? '正價差 // FUTURES PREMIUM'
+                    : basis<0
+                        ? '逆價差 // FUTURES DISCOUNT'
+                        : '平價差 // PARITY';
+                if(basis>0) bb.classList.add('positive');
+                else if(basis<0) bb.classList.add('negative');
+            } else if(bothOfficial && !sameOfficialDate) {
+                bv.textContent='--';
+                bv.className='value neutral';
+                bl.className='sub neutral';
+                bl.textContent=`日期不同 // TAIEX ${taiexDateKey||'--'}・TX ${txDateKey||'--'}`;
+            } else {
+                bv.textContent='--';
+                bv.className='value neutral';
+                bl.className='sub neutral';
+                bl.textContent='等待同日 TAIEX / TX';
+            }
         }
 
         const status=document.getElementById('marketPulseStatus'),src=document.getElementById('mpSourceText');
         const ts=taiex?'TWSE OFFICIAL':'STATIC DB';
         const xs=tx?'TAIFEX OFFICIAL CACHE':'STATIC DB';
-        if(status) status.textContent=`🌐 YUANTA OFFLINE｜TAIEX ${ts}${taiex?.date?` ${taiex.date}`:''}｜TX ${xs}${tx?.front?.date?` ${tx.front.date} ${tx.front.month}`:''}`;
-        if(src) src.textContent=`DATA SOURCE ｜TAIEX ${ts}｜TX FRONT/ALL ${xs}｜BASIS CALC｜非即時`;
+
+        const txFrontDate = tx?.front?.date || staticData?.txDate || '';
+        const txAllSession = tx?.all?.session || '';
+        const txContract = tx?.front?.month || staticData?.txContractMonth || '';
+        const cacheStamp = tx?.cacheGeneratedAtUtc ? `｜CACHE ${tx.cacheGeneratedAtUtc}` : '';
+
+        if(status) {
+            status.textContent =
+                `🌐 YUANTA OFFLINE｜TAIEX ${ts}${taiex?.date?` ${taiex.date}`:''}｜TX ${xs}${txFrontDate?` ${txFrontDate}`:''}${txContract?` ${txContract}`:''}`;
+        }
+        if(src) {
+            src.textContent =
+                `DATA SOURCE ｜TAIEX ${ts}｜TX FRONT/ALL ${xs}${txAllSession?` (${txAllSession})`:''}｜BASIS ${sameOfficialDate||!bothOfficial?'CALC':'DATE GUARD'}｜非即時${cacheStamp}`;
+        }
         return true;
     }
 
