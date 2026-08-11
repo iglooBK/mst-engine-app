@@ -1,0 +1,49 @@
+name: Update JPX Market Cache
+
+on:
+  workflow_dispatch:
+  schedule:
+    # JPX says settlement data is normally published around 16:45 JST.
+    # Taiwan 16:05 / 16:35 = UTC 08:05 / 08:35 = Japan 17:05 / 17:35.
+    # Two attempts give the official file time to appear.
+    - cron: "5,35 8 * * 1-5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jpx-market-cache
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Fetch JPX official Nikkei 225 settlement data
+        run: python fetch-jpx-market.py
+
+      - name: Commit cache only when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- jpx-market-latest.json; then
+            echo "No JPX market-data change."
+            exit 0
+          fi
+
+          git config user.name "PLOUTOS Market Bot"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add jpx-market-latest.json
+          git commit -m "chore: update JPX market cache"
+
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
