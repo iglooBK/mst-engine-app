@@ -1,4 +1,4 @@
-name: Update TAIFEX Market Cache
+name: Update TAIFEX + CME Gold Market Cache
 
 on:
   workflow_dispatch:
@@ -32,16 +32,37 @@ jobs:
 
       - name: Fetch TAIFEX official market data
         run: python fetch-taifex-market.py
+      - name: Fetch CME Gold official settlement data
+        id: cme_gold
+        continue-on-error: true
+        run: python fetch-cme-gold-PRODUCTION.py
 
       - name: Commit cache only when changed
         shell: bash
         run: |
-          if git diff --quiet -- taifex-market-latest.json; then
-            echo "No TAIFEX data change."
+          if [ -z "$(git status --porcelain -- taifex-market-latest.json cme-gold-latest.json)" ]; then
+            echo "No TAIFEX / CME Gold data change."
             exit 0
           fi
+
           git config user.name "PLOUTOS Market Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add taifex-market-latest.json
-          git commit -m "chore: update TAIFEX market cache"
-          git push
+
+          [ -f taifex-market-latest.json ] && git add taifex-market-latest.json
+          [ -f cme-gold-latest.json ] && git add cme-gold-latest.json
+
+          if git diff --cached --quiet; then
+            echo "No cache file staged."
+            exit 0
+          fi
+
+          git commit -m "chore: update TAIFEX and CME Gold market cache"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Fail if CME Gold fetch failed
+        if: steps.cme_gold.outcome == 'failure'
+        run: |
+          echo "::error::CME Gold official settlement fetch failed."
+          exit 1
+    
