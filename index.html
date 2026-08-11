@@ -2865,10 +2865,10 @@
         }
     }
 
-    /* 📰 NEWS FEED v2 // 跟隨目前股票，自動抓「當日」重要新聞
+    /* 📰 NEWS FEED v2.1 // 跟隨目前股票，自動抓「最近 72 小時」重要新聞
        - 主要搜尋公司名稱，不再把「代號 + 名稱」整串硬丟給 Google News
        - 公司名稱無結果時，自動 fallback 到「代號 + 公司名稱」與純代號
-       - 合併 / 去重後只保留 Asia/Taipei 當日新聞，依時間新到舊顯示 Top 10
+       - 合併 / 去重後只保留最近 72 小時新聞，依時間新到舊顯示 Top 10
        - RSS2JSON 暫時異常與「今天真的沒有新聞」分開顯示，避免誤判 */
     async function fetchStockNews(portfolioName) {
         const newsContainer = document.getElementById('newsListContainer');
@@ -2910,7 +2910,7 @@
         addQuery(stockCode);
         if (!queries.length) addQuery(rawInput);
 
-        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [GOOGLE NEWS] 擷取「${displayName}」當日重要新聞中...</div>`;
+        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [GOOGLE NEWS] 擷取「${displayName}」最近 72 小時重要新聞中...</div>`;
 
         const taipeiDateKey = value => {
             const d = value instanceof Date ? value : new Date(value);
@@ -2926,7 +2926,8 @@
             }
         };
 
-        const todayKey = taipeiDateKey(new Date());
+        const newsNow = Date.now();
+        const newsWindowStart = newsNow - (72 * 60 * 60 * 1000);
         const allItems = [];
         let serviceSucceeded = false;
         let lastError = null;
@@ -2951,20 +2952,21 @@
             }
         }
 
-        // 同標題 / 同連結去重，並限定台北時區的「今天」。
+        // 同標題 / 同連結去重，並限定最近 72 小時。
         const seen = new Set();
-        const todayItems = allItems
+        const recentItems = allItems
             .filter(item => {
                 const key = String(item?.link || item?.title || '').trim();
                 if (!key || seen.has(key)) return false;
                 seen.add(key);
-                return taipeiDateKey(item?.pubDate) === todayKey;
+                const publishedAt = new Date(item?.pubDate).getTime();
+                return Number.isFinite(publishedAt) && publishedAt >= newsWindowStart && publishedAt <= newsNow;
             })
             .sort((a, b) => new Date(b?.pubDate || 0) - new Date(a?.pubDate || 0))
             .slice(0, 10);
 
-        if (todayItems.length > 0) {
-            newsContainer.innerHTML = todayItems.map((item, idx) => {
+        if (recentItems.length > 0) {
+            newsContainer.innerHTML = recentItems.map((item, idx) => {
                 const pubDate = new Date(item.pubDate);
                 const timeStr = new Intl.DateTimeFormat('zh-TW', {
                     timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit',
@@ -2987,7 +2989,7 @@
             return;
         }
 
-        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 今日暫無「${displayName}」的重要新聞。</div>`;
+        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 最近 72 小時暫無「${displayName}」的重要新聞。</div>`;
     }
 
     function refreshNews() {
