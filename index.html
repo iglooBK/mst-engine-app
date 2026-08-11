@@ -2865,50 +2865,129 @@
         }
     }
 
-    /* 📰 即時新聞抓取 (使用 Google News RSS + RSS2JSON) */
+    /* 📰 NEWS FEED v2 // 跟隨目前股票，自動抓「當日」重要新聞
+       - 主要搜尋公司名稱，不再把「代號 + 名稱」整串硬丟給 Google News
+       - 公司名稱無結果時，自動 fallback 到「代號 + 公司名稱」與純代號
+       - 合併 / 去重後只保留 Asia/Taipei 當日新聞，依時間新到舊顯示 Top 10
+       - RSS2JSON 暫時異常與「今天真的沒有新聞」分開顯示，避免誤判 */
     async function fetchStockNews(portfolioName) {
         const newsContainer = document.getElementById('newsListContainer');
         const newsStockTitle = document.getElementById('newsStockTitle');
         if (!newsContainer) return;
 
-        const cleanQuery = portfolioName.replace(/[()（）]/g, ' ').trim();
-        if (newsStockTitle) newsStockTitle.textContent = cleanQuery || '未命名個股';
+        const rawInput = String(portfolioName || '').replace(/[()（）]/g, ' ').replace(/\s+/g, ' ').trim();
+        const codeMatch = rawInput.toUpperCase().match(/\b([0-9]{4,6}[A-Z]?)\b/);
+        const stockCode = codeMatch ? codeMatch[1] : '';
 
-        if (!cleanQuery) {
+        // 優先使用 Master DB 的正式股票名稱；沒有資料時才從輸入文字移除代號後取得名稱。
+        let stockName = '';
+        try {
+            const info = stockCode && typeof lookupStockInfo === 'function' ? lookupStockInfo(stockCode) : null;
+            stockName = String(info?.name || '').trim();
+        } catch (e) {}
+        if (!stockName) {
+            stockName = stockCode
+                ? rawInput.replace(new RegExp(`\\b${stockCode}\\b`, 'ig'), ' ').replace(/\s+/g, ' ').trim()
+                : rawInput;
+        }
+
+        const displayName = [stockCode, stockName].filter(Boolean).join(' ') || rawInput;
+        if (newsStockTitle) newsStockTitle.textContent = displayName || '未命名個股';
+
+        if (!displayName) {
             newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 請先輸入有效的股票名稱或代號。</div>`;
             return;
         }
 
-        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [BLOOMBERG FEED] 擷取 「${cleanQuery}」 當天焦點新聞中...</div>`;
+        // 對新聞搜尋而言，公司名稱通常比「2454 聯發科」更穩定；後兩個 query 作為保險。
+        const queries = [];
+        const addQuery = q => {
+            const clean = String(q || '').replace(/\s+/g, ' ').trim();
+            if (clean && !queries.includes(clean)) queries.push(clean);
+        };
+        addQuery(stockName);
+        addQuery([stockCode, stockName].filter(Boolean).join(' '));
+        addQuery(stockCode);
+        if (!queries.length) addQuery(rawInput);
 
-        try {
-            const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
-            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [GOOGLE NEWS] 擷取「${displayName}」當日重要新聞中...</div>`;
 
-            const response = await fetch(apiUrl);
-            const data = await response.json();
-
-            if (data.status === 'ok' && data.items && data.items.length > 0) {
-                const top10 = data.items.slice(0, 10);
-                newsContainer.innerHTML = top10.map((item, idx) => {
-                    const pubDate = new Date(item.pubDate);
-                    const timeStr = `${(pubDate.getMonth() + 1).toString().padStart(2, '0')}/${pubDate.getDate().toString().padStart(2, '0')} ${pubDate.getHours().toString().padStart(2, '0')}:${pubDate.getMinutes().toString().padStart(2, '0')}`;
-
-                    return `
-                        <div class="news-item">
-                            <span class="news-no">[#${idx + 1}]</span>
-                            <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="news-title" title="${item.title}">${item.title}</a>
-                            <span class="news-date">${timeStr}</span>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 暫無關聯「${cleanQuery}」的當日重要新聞。</div>`;
+        const taipeiDateKey = value => {
+            const d = value instanceof Date ? value : new Date(value);
+            if (isNaN(d)) return '';
+            try {
+                const parts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'
+                }).formatToParts(d);
+                const map = Object.fromEntries(parts.map(x => [x.type, x.value]));
+                return `${map.year}-${map.month}-${map.day}`;
+            } catch (e) {
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
             }
-        } catch (error) {
-            console.error('News fetch error:', error);
-            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞連線失敗，請稍後重試。</div>`;
+        };
+
+        const todayKey = taipeiDateKey(new Date());
+        const allItems = [];
+        let serviceSucceeded = false;
+        let lastError = null;
+
+        for (const query of queries) {
+            try {
+                const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+                const response = await fetch(`${apiUrl}&_=${Date.now()}`, {cache:'no-store'});
+                if (!response.ok) throw new Error(`RSS2JSON HTTP ${response.status}`);
+                const data = await response.json();
+
+                if (data?.status === 'ok') {
+                    serviceSucceeded = true;
+                    if (Array.isArray(data.items)) allItems.push(...data.items);
+                } else {
+                    lastError = new Error(data?.message || 'RSS2JSON returned non-ok status');
+                }
+            } catch (error) {
+                lastError = error;
+                console.warn('News query failed:', query, error);
+            }
         }
+
+        // 同標題 / 同連結去重，並限定台北時區的「今天」。
+        const seen = new Set();
+        const todayItems = allItems
+            .filter(item => {
+                const key = String(item?.link || item?.title || '').trim();
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return taipeiDateKey(item?.pubDate) === todayKey;
+            })
+            .sort((a, b) => new Date(b?.pubDate || 0) - new Date(a?.pubDate || 0))
+            .slice(0, 10);
+
+        if (todayItems.length > 0) {
+            newsContainer.innerHTML = todayItems.map((item, idx) => {
+                const pubDate = new Date(item.pubDate);
+                const timeStr = new Intl.DateTimeFormat('zh-TW', {
+                    timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                }).format(pubDate);
+                return `
+                    <div class="news-item">
+                        <span class="news-no">[#${idx + 1}]</span>
+                        <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="news-title" title="${item.title}">${item.title}</a>
+                        <span class="news-date">${timeStr}</span>
+                    </div>
+                `;
+            }).join('');
+            return;
+        }
+
+        if (!serviceSucceeded) {
+            console.error('News feed unavailable:', lastError);
+            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得，請稍後按「重整新聞」再試。</div>`;
+            return;
+        }
+
+        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 今日暫無「${displayName}」的重要新聞。</div>`;
     }
 
     function refreshNews() {
