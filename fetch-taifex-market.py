@@ -59,15 +59,19 @@ with urllib.request.urlopen(req, timeout=25) as r:
 rows = raw if isinstance(raw, list) else raw.get("data", [])
 parsed = []
 
+# Verified from GitHub Actions / TAIFEX OpenAPI on 2026-08-11:
+# English schema example:
+# Date, Contract, ContractMonth(Week), Open, High, Low, Last, Change, %, Volume,
+# SettlementPrice, OpenInterest, BestBid, BestAsk, TradingSession, ...
 for o in rows:
     if not isinstance(o, dict):
         continue
     contract = str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
-    month = str(get(o, "到期月份(週別)", "到期月份", "Contract Month(Week)", "ContractMonth") or "").strip()
+    month = str(get(o, "到期月份(週別)", "到期月份", "ContractMonth(Week)", "Contract Month(Week)", "ContractMonth") or "").strip()
     date = get(o, "日期", "交易日期", "Date")
     close = num(get(o, "最後成交價", "收盤價", "Last", "Closing Price", "ClosingPrice", "Close"))
     change = num(get(o, "漲跌價", "Change"))
-    pct = num(get(o, "漲跌%", "漲跌％", "漲跌百分比", "Change Percent", "ChangePercent"))
+    pct = num(get(o, "漲跌%", "漲跌％", "漲跌百分比", "%", "Change Percent", "ChangePercent"))
     session = str(get(o, "交易時段", "Trading Session", "TradingSession", "Session") or "").strip()
 
     # Only outright monthly TX; exclude calendar spreads such as 202608/202609.
@@ -91,8 +95,38 @@ for o in rows:
 
 if not parsed:
     print("ERROR: TAIFEX returned no usable outright monthly TX rows.", file=sys.stderr)
+
     if isinstance(rows, list) and rows:
-        print("Sample row:", json.dumps(rows[0], ensure_ascii=False), file=sys.stderr)
+        # Diagnostic 1: list all distinct contract codes seen.
+        contracts = []
+        seen = set()
+        for o in rows:
+            if not isinstance(o, dict):
+                continue
+            c = str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
+            if c and c not in seen:
+                seen.add(c)
+                contracts.append(c)
+
+        print("TAIFEX CONTRACTS FOUND:", ", ".join(contracts[:200]), file=sys.stderr)
+
+        # Diagnostic 2: print rows whose contract code/name contains TX.
+        tx_like = []
+        for o in rows:
+            if not isinstance(o, dict):
+                continue
+            c = str(get(o, "契約", "Contract", "商品契約代號", "商品代號") or "").strip().upper()
+            if "TX" in c:
+                tx_like.append(o)
+
+        print(f"TX-LIKE ROW COUNT: {len(tx_like)}", file=sys.stderr)
+        for i, row in enumerate(tx_like[:10], 1):
+            print(f"TX-LIKE SAMPLE #{i}: {json.dumps(row, ensure_ascii=False)}", file=sys.stderr)
+
+        # Diagnostic 3: print first 5 raw rows for schema/reference.
+        for i, row in enumerate(rows[:5], 1):
+            print(f"RAW SAMPLE #{i}: {json.dumps(row, ensure_ascii=False)}", file=sys.stderr)
+
     sys.exit(2)
 
 latest_date = max(x["dateKey"] for x in parsed)
