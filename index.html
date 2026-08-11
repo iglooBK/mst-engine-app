@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: MARKET-PULSE-ALIGNED-v2.9 | TW full row + US full row + centered JP -->
+<!-- PLOUTOS GitHub Release: v2.9.8 OFFICIAL-FAILOVER | Yuanta LIVE → TWSE/TAIFEX official online → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -2928,7 +2928,8 @@
         return getStockMarket(stockNo) === 'TPEx' ? 'TPEx 上櫃' : 'TWSE 上市';
     }
 
-    /* 📈 TWSE：官方 STOCK_DAY，逐月往回抓取 */
+    /* 📈 TWSE：官方 STOCK_DAY，逐月往回抓取
+       v2.9.7 FAST-SWITCH：每月請求加入 5 秒 timeout，避免單一 TWSE request 卡死整個 UI。 */
     async function fetchTwseRecentCloses(stockNo, minCount, maxMonthsToTry = 8) {
         const results = [];
         const now = new Date();
@@ -2938,9 +2939,12 @@
 
         while (results.length < minCount && monthsTried < maxMonthsToTry) {
             const dateParam = `${year}${String(month).padStart(2, '0')}01`;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
             try {
                 const url = `https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?response=json&date=${dateParam}&stockNo=${stockNo}`;
-                const res = await fetch(url, { cache: 'no-store' });
+                const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const json = await res.json();
 
                 if (json && json.stat === 'OK' && Array.isArray(json.data)) {
@@ -2967,17 +2971,20 @@
                     results.unshift(...monthCloses);
                 }
             } catch (e) {
-                console.error('TWSE history fetch error for', dateParam, e);
+                console.warn('TWSE history fetch skipped:', stockNo, dateParam, e?.name || e);
+            } finally {
+                clearTimeout(timer);
             }
 
             monthsTried++;
             month--;
             if (month === 0) { month = 12; year--; }
-            await new Promise(r => setTimeout(r, 150));
+            await new Promise(r => setTimeout(r, 80));
         }
 
-        results.sort((a, b) => a.date - b.date);
-        return results;
+        const byDate = new Map();
+        results.forEach(item => byDate.set(item.dateStr, item));
+        return Array.from(byDate.values()).sort((a, b) => a.date - b.date);
     }
 
     /* 📈 TPEx 上櫃歷史股價：瀏覽器跨網域韌性版
@@ -3099,11 +3106,66 @@
         return fetchTpexOfficialCloses(stockNo, minCount, maxMonthsToTry);
     }
 
-    /* 📈 台股統一入口：自動依 stock-list.js 的 market 分流 TWSE / TPEx */
-    async function fetchRecentCloses(stockNo, minCount, maxMonthsToTry = 8) {
-        return getStockMarket(stockNo) === 'TPEx'
-            ? fetchTpexRecentCloses(stockNo, minCount, maxMonthsToTry)
-            : fetchTwseRecentCloses(stockNo, minCount, maxMonthsToTry);
+    /* 📈 v2.9.7 歷史資料快取：切回已看過的股票時直接使用，不重新等待遠端 API。 */
+    const PLOUTOS_HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+    const PLOUTOS_HISTORY_CACHE_PREFIX = 'PLOUTOS_HISTORY_V297_';
+    const ploutosHistoryMemoryCache = new Map();
+
+    function ploutosHistoryCacheKey(stockNo) {
+        return `${getStockMarket(stockNo)}:${String(stockNo).toUpperCase()}`;
+    }
+
+    function ploutosHydrateHistoryRows(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.map(x => ({...x, date: x?.date instanceof Date ? x.date : new Date(x.date || x.dateStr)}))
+            .filter(x => Number.isFinite(Number(x.close)) && x.date instanceof Date && !isNaN(x.date));
+    }
+
+    function ploutosGetHistoryCache(stockNo, minCount = 1) {
+        const key = ploutosHistoryCacheKey(stockNo);
+        const now = Date.now();
+        const mem = ploutosHistoryMemoryCache.get(key);
+        if (mem && now - mem.savedAt <= PLOUTOS_HISTORY_CACHE_TTL_MS && mem.rows?.length >= minCount) {
+            return ploutosHydrateHistoryRows(mem.rows);
+        }
+        try {
+            const raw = localStorage.getItem(PLOUTOS_HISTORY_CACHE_PREFIX + key);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || now - Number(parsed.savedAt || 0) > PLOUTOS_HISTORY_CACHE_TTL_MS) return null;
+            const rows = ploutosHydrateHistoryRows(parsed.rows);
+            if (rows.length < minCount) return null;
+            ploutosHistoryMemoryCache.set(key, {savedAt: parsed.savedAt, rows});
+            return rows;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function ploutosSetHistoryCache(stockNo, rows) {
+        if (!Array.isArray(rows) || !rows.length) return;
+        const key = ploutosHistoryCacheKey(stockNo);
+        const savedAt = Date.now();
+        const cleanRows = rows.map(x => ({...x, date: x.date instanceof Date ? x.date.toISOString() : x.date}));
+        ploutosHistoryMemoryCache.set(key, {savedAt, rows: ploutosHydrateHistoryRows(cleanRows)});
+        try {
+            localStorage.setItem(PLOUTOS_HISTORY_CACHE_PREFIX + key, JSON.stringify({savedAt, rows: cleanRows}));
+        } catch (e) {
+            // Browser storage can be unavailable/full; memory cache still works.
+        }
+    }
+
+    /* 📈 台股統一入口：自動依 stock-list.js 的 market 分流 TWSE / TPEx。 */
+    async function fetchRecentCloses(stockNo, minCount, maxMonthsToTry = 8, forceRefresh = false) {
+        if (!forceRefresh) {
+            const cached = ploutosGetHistoryCache(stockNo, minCount);
+            if (cached) return cached;
+        }
+        const rows = getStockMarket(stockNo) === 'TPEx'
+            ? await fetchTpexRecentCloses(stockNo, minCount, maxMonthsToTry)
+            : await fetchTwseRecentCloses(stockNo, minCount, maxMonthsToTry);
+        if (rows?.length) ploutosSetHistoryCache(stockNo, rows);
+        return rows;
     }
 
 
@@ -3129,6 +3191,7 @@
         baseCloses: null
     };
     let ploutosLastStockLiveMode = 'STATIC';
+    let ploutosAnalysisRequestId = 0; // v2.9.7: prevents slow old requests from overwriting a newer stock selection.
 
     function ploutosTodayDateStr() {
         const d = new Date();
@@ -3205,6 +3268,47 @@
             }
         }
         return null;
+    }
+
+    async function ploutosWaitForSelectedStockLive(stockNo, timeoutMs = 2600) {
+        const deadline = Date.now() + timeoutMs;
+        do {
+            const live = await ploutosFetchStockLive(stockNo);
+            if (live) return live;
+            await new Promise(r => setTimeout(r, 220));
+        } while (Date.now() < deadline);
+        return null;
+    }
+
+    function ploutosRenderLivePreview(live, statusEl) {
+        if (!live?.snapshot) return;
+        const s = live.snapshot;
+        const yesterday = Number(s.yesterday);
+        renderLatestPrice({
+            latest: {
+                date: new Date(),
+                dateStr: ploutosTodayDateStr(),
+                open: s.open,
+                close: s.deal,
+                high: s.high,
+                low: s.low,
+                volume: NaN,
+                yuantaLive: true
+            },
+            prevClose: Number.isFinite(yesterday) && yesterday > 0
+                ? {date: new Date(Date.now() - 86400000), dateStr: '前收', close: yesterday}
+                : null,
+            source: 'YUANTA_LIVE',
+            updatedAt: live.updatedAt,
+            yuantaUpStopPrice: s.upStopPrice,
+            yuantaDownStopPrice: s.downStopPrice,
+            yuantaOpen: s.open,
+            yuantaHigh: s.high,
+            yuantaLow: s.low,
+            yuantaOrderFlow: live.orderFlow
+        });
+        ploutosSyncMarketPriceFromLive(s.deal);
+        if (statusEl) statusEl.textContent = `🟢 YUANTA LIVE 現價已就緒｜歷史均線背景載入中...`;
     }
 
     function ploutosMergeLiveIntoCloses(baseCloses, live) {
@@ -3365,8 +3469,13 @@
         }, 3000);
     }
 
-    /* 📈 主流程：抓取股價並更新均線落點顯示 */
+    /* 📈 主流程 v2.9.7 FAST-SWITCH
+       - Yuanta LIVE 優先顯示，不被歷史 API 阻塞
+       - 歷史資料使用 6 小時 cache
+       - 遠端歷史資料背景更新
+       - Request ID 防止快速切股時舊資料覆蓋新股票 */
     async function fetchMovingAverages(portfolioName) {
+        const requestId = ++ploutosAnalysisRequestId;
         const statusEl = document.getElementById('maStatusText');
         const titleEl = document.getElementById('maStockTitle');
         const valueIds = { ma5: 'ma5Value', ma10: 'ma10Value', ma20: 'ma20Value', ma60: 'ma60Value' };
@@ -3398,33 +3507,86 @@
             return;
         }
 
-        // This sends ONLY the selected public stock code + market to localhost.
-        // If localhost is unavailable, historical/static analysis continues normally.
-        ploutosSelectLocalStock(stockNo).catch(() => {});
-
         const marketDisplay = getStockMarketDisplay(stockNo);
-        statusEl.textContent = `📡 [${marketDisplay}] 擷取「${stockNo}」歷史股價中，請稍候...`;
+        const cachedHistory = ploutosGetHistoryCache(stockNo, 65);
+        statusEl.textContent = cachedHistory
+            ? `⚡ [${marketDisplay}] 已載入「${stockNo}」歷史快取｜同步 YUANTA LIVE...`
+            : `📡 [${marketDisplay}] 同步 YUANTA LIVE｜歷史均線背景載入中...`;
+
+        // Start Yuanta selection/live and history work in parallel.
+        const livePromise = (async () => {
+            await ploutosSelectLocalStock(stockNo).catch(() => false);
+            const live = await ploutosWaitForSelectedStockLive(stockNo, 2600);
+            if (requestId !== ploutosAnalysisRequestId) return null;
+            if (live) {
+                ploutosRenderLivePreview(live, statusEl);
+                ploutosLastStockLiveMode = 'LIVE';
+            }
+            return live;
+        })();
+
+        // Cache hit: render MA immediately, then refresh history silently in background.
+        if (cachedHistory?.length) {
+            ploutosAnalysisCache = {
+                stockNo,
+                portfolioName: cleanName,
+                baseCloses: cachedHistory.map(x => ({...x}))
+            };
+            const liveNow = await Promise.race([
+                livePromise,
+                new Promise(resolve => setTimeout(() => resolve(null), 350))
+            ]);
+            if (requestId !== ploutosAnalysisRequestId) return;
+            if (liveNow) {
+                const merged = ploutosMergeLiveIntoCloses(ploutosAnalysisCache.baseCloses, liveNow);
+                ploutosRenderAnalysisFromCloses(merged, stockNo, statusEl, liveNow);
+            } else {
+                ploutosRenderAnalysisFromCloses(ploutosAnalysisCache.baseCloses, stockNo, statusEl, null);
+                statusEl.textContent = `⚡ [${marketDisplay}] 歷史快取已就緒｜等待 YUANTA LIVE...`;
+                livePromise.then(liveLater => {
+                    if (!liveLater || requestId !== ploutosAnalysisRequestId) return;
+                    const merged = ploutosMergeLiveIntoCloses(ploutosAnalysisCache.baseCloses, liveLater);
+                    ploutosRenderAnalysisFromCloses(merged, stockNo, statusEl, liveLater);
+                }).catch(() => {});
+            }
+
+            fetchRecentCloses(stockNo, 65, 8, true).then(freshRows => {
+                if (!freshRows?.length || requestId !== ploutosAnalysisRequestId) return;
+                ploutosAnalysisCache = {
+                    stockNo,
+                    portfolioName: cleanName,
+                    baseCloses: freshRows.map(x => ({...x}))
+                };
+                ploutosRefreshSelectedStockLiveFromCache().catch(() => {});
+            }).catch(() => {});
+            return;
+        }
 
         try {
-            const baseCloses = await fetchRecentCloses(stockNo, 65);
+            const [baseCloses, live] = await Promise.all([
+                fetchRecentCloses(stockNo, 65),
+                livePromise
+            ]);
+            if (requestId !== ploutosAnalysisRequestId) return;
 
             if (!baseCloses || baseCloses.length === 0) {
-                statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情，請稍後再按「更新所有數據」。`;
+                if (live) {
+                    statusEl.textContent = `🟢 YUANTA LIVE 正常｜⚠️ ${marketDisplay} 歷史均線暫時無法取得，可稍後按「重新計算」。`;
+                    return;
+                }
+                statusEl.textContent = `❌ 無法取得「${stockNo}」歷史行情；YUANTA LIVE 目前也尚未就緒。`;
                 renderCrossAlert(null);
                 renderSupportResistance(null);
                 renderPloutosGuide(null);
-                renderLatestPrice(null);
                 return;
             }
 
-            // Keep an untouched historical base. The live layer is an overlay only.
             ploutosAnalysisCache = {
                 stockNo,
                 portfolioName: cleanName,
                 baseCloses: baseCloses.map(x => ({...x}))
             };
 
-            const live = await ploutosFetchStockLive(stockNo);
             if (live) {
                 const merged = ploutosMergeLiveIntoCloses(ploutosAnalysisCache.baseCloses, live);
                 ploutosRenderAnalysisFromCloses(merged, stockNo, statusEl, live);
@@ -3434,12 +3596,9 @@
                 ploutosLastStockLiveMode = 'STATIC';
             }
         } catch (error) {
+            if (requestId !== ploutosAnalysisRequestId) return;
             console.error('Moving average error:', error);
-            statusEl.textContent = `❌ 均線資料擷取失敗，可能是網路問題，或 ${getStockMarketDisplay(stockNo)} 暫時無法連線，請稍後重試。`;
-            renderCrossAlert(null);
-            renderSupportResistance(null);
-            renderPloutosGuide(null);
-            renderLatestPrice(null);
+            statusEl.textContent = `⚠️ 歷史均線資料暫時無法取得；YUANTA LIVE 若已連線仍會繼續顯示。`;
         }
     }
 
@@ -3868,6 +4027,333 @@
         return true;
     }
 
+
+    /* ============================================================
+       🌐 PLOUTOS MARKET PULSE // OFFICIAL ONLINE FAILOVER v1
+       - Yuanta unavailable: show latest COMPLETED official TWSE/TAIFEX data.
+       - Not real-time; never label these values as LIVE.
+       ============================================================ */
+    const PLOUTOS_OFFICIAL_MARKET_CACHE_TTL_MS = 60 * 1000;
+    let ploutosOfficialMarketCache = null;
+
+    function mpOfficialNum(value) {
+        if (value === null || value === undefined) return null;
+        const s = String(value).trim().replace(/,/g, '').replace(/%/g, '');
+        if (!s || s === '--' || s === '-' || s === 'N/A') return null;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    function mpOfficialDateKey(raw) {
+        const s = String(raw || '').trim();
+        const m = s.match(/(\d{4})[\/\-.]?(\d{1,2})[\/\-.]?(\d{1,2})/);
+        if (!m) return '';
+        return `${m[1]}${String(m[2]).padStart(2,'0')}${String(m[3]).padStart(2,'0')}`;
+    }
+
+    function mpOfficialField(obj, exactAliases = [], fuzzyTokens = []) {
+        if (!obj || typeof obj !== 'object') return undefined;
+        for (const key of exactAliases) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) return obj[key];
+        }
+        const norm = s => String(s || '').toLowerCase().replace(/[\s_\-()%/（）]/g, '');
+        for (const key of Object.keys(obj)) {
+            const nk = norm(key);
+            if (fuzzyTokens.some(token => nk.includes(norm(token)))) return obj[key];
+        }
+        return undefined;
+    }
+
+    async function mpFetchOfficialTaiex() {
+        const now = new Date();
+        const months = [];
+        for (let i = 0; i < 2; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            months.push(`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}01`);
+        }
+
+        const rows = [];
+        for (const dateParam of months) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 6500);
+            try {
+                const url = `https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?response=json&date=${dateParam}`;
+                const res = await fetch(url, {cache:'no-store', signal: controller.signal});
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                if (!json || json.stat !== 'OK' || !Array.isArray(json.data)) continue;
+
+                const fields = Array.isArray(json.fields) ? json.fields : [];
+                let idxClose = fields.findIndex(f => String(f).includes('發行量加權股價指數'));
+                if (idxClose < 0) idxClose = fields.findIndex(f => String(f).includes('指數'));
+                if (idxClose < 0) idxClose = 4;
+
+                for (const row of json.data) {
+                    const roc = String(row?.[0] || '').split('/');
+                    if (roc.length < 3) continue;
+                    const y = Number(roc[0]) + 1911;
+                    const m = Number(roc[1]);
+                    const d = Number(roc[2]);
+                    const close = mpOfficialNum(row?.[idxClose]);
+                    if (!Number.isFinite(close)) continue;
+                    rows.push({
+                        dateKey: `${y}${String(m).padStart(2,'0')}${String(d).padStart(2,'0')}`,
+                        dateText: `${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}`,
+                        close
+                    });
+                }
+            } catch (e) {
+                console.warn('Official TAIEX fallback failed:', dateParam, e?.name || e);
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        const uniq = new Map();
+        rows.forEach(r => uniq.set(r.dateKey, r));
+        const sorted = Array.from(uniq.values()).sort((a,b) => a.dateKey.localeCompare(b.dateKey));
+        if (!sorted.length) return null;
+        const latest = sorted[sorted.length - 1];
+        const prev = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
+        const change = prev ? latest.close - prev.close : null;
+        const pct = prev && prev.close ? change / prev.close * 100 : null;
+        return {
+            deal: latest.close,
+            yesterday: prev?.close ?? null,
+            change,
+            changePct: pct,
+            date: latest.dateText,
+            dateKey: latest.dateKey,
+            source: 'TWSE_OFFICIAL'
+        };
+    }
+
+    function mpNormalizeTaifexRows(raw) {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.data)) return raw.data;
+        if (Array.isArray(raw?.result)) return raw.result;
+        if (Array.isArray(raw?.results)) return raw.results;
+        return [];
+    }
+
+    function mpTaifexRow(row) {
+        const contract = String(mpOfficialField(row,
+            ['Contract','contract','契約','商品代號','CommodityID','commodity_id'],
+            ['契約','contract','commodity']) || '').trim().toUpperCase();
+        const month = String(mpOfficialField(row,
+            ['ContractMonth','contractMonth','到期月份(週別)','到期月份','DeliveryMonth'],
+            ['到期月份','contractmonth','deliverymonth']) || '').trim().replace(/\s/g,'');
+        const dateRaw = mpOfficialField(row,
+            ['Date','date','交易日期','日期','TradingDate'],
+            ['交易日期','tradingdate','date']);
+        const close = mpOfficialNum(mpOfficialField(row,
+            ['ClosingPrice','closingPrice','Close','close','最後成交價','收盤價','LastPrice'],
+            ['最後成交價','收盤價','closingprice','lastprice']));
+        const change = mpOfficialNum(mpOfficialField(row,
+            ['Change','change','漲跌價','ChangeAmount'],
+            ['漲跌價','changeamount']));
+        const pct = mpOfficialNum(mpOfficialField(row,
+            ['ChangePercent','changePercent','漲跌%','漲跌％','ChangePct'],
+            ['changepercent','changepct','漲跌%','漲跌％']));
+        const session = String(mpOfficialField(row,
+            ['TradingSession','tradingSession','交易時段','Session'],
+            ['交易時段','tradingsession','session']) || '').trim();
+        return {
+            contract,
+            month,
+            dateRaw: String(dateRaw || '').trim(),
+            dateKey: mpOfficialDateKey(dateRaw),
+            close,
+            change,
+            pct,
+            session
+        };
+    }
+
+    function mpIsTxContract(rec) {
+        const c = String(rec?.contract || '').toUpperCase().replace(/\s/g,'');
+        return c === 'TX' || c.startsWith('TX') || c.includes('臺股期貨') || c.includes('台股期貨');
+    }
+
+    function mpContractMonthRank(month) {
+        const m = String(month || '').match(/(\d{6})/);
+        return m ? Number(m[1]) : 99999999;
+    }
+
+    function mpSessionKind(session) {
+        const s = String(session || '').toLowerCase();
+        if (s.includes('盤後') || s.includes('after') || s.includes('夜')) return 'AFTER_HOURS';
+        if (s.includes('一般') || s.includes('regular') || s.includes('日')) return 'REGULAR';
+        return 'UNKNOWN';
+    }
+
+    async function mpFetchOfficialTaifexTx() {
+        const target = 'https://openapi.taifex.com.tw/v1/DailyMarketReportFut';
+        const raw = await fetchJsonWithCorsFallback(target, 12000);
+        const rows = mpNormalizeTaifexRows(raw)
+            .map(mpTaifexRow)
+            .filter(r => mpIsTxContract(r) && Number.isFinite(r.close) && r.dateKey && r.month);
+
+        if (!rows.length) return null;
+
+        const latestDate = rows.reduce((m,r) => r.dateKey > m ? r.dateKey : m, '');
+        const latestRows = rows.filter(r => r.dateKey === latestDate);
+        const monthly = latestRows.filter(r => /(\d{6})/.test(r.month));
+        const pool = monthly.length ? monthly : latestRows;
+        const nearestMonthRank = Math.min(...pool.map(r => mpContractMonthRank(r.month)));
+        const near = pool.filter(r => mpContractMonthRank(r.month) === nearestMonthRank);
+        if (!near.length) return null;
+
+        const regular = near.find(r => mpSessionKind(r.session) === 'REGULAR') || near[0];
+        const after = near.find(r => mpSessionKind(r.session) === 'AFTER_HOURS');
+        const all = after || regular;
+
+        const normalize = rec => rec ? {
+            deal: rec.close,
+            change: Number.isFinite(rec.change) ? rec.change : null,
+            changePct: Number.isFinite(rec.pct) ? rec.pct : null,
+            date: rec.dateRaw || latestDate,
+            dateKey: rec.dateKey,
+            contractMonth: rec.month,
+            session: rec.session || 'Official',
+            source: 'TAIFEX_OFFICIAL'
+        } : null;
+
+        return {
+            front: normalize(regular),
+            all: normalize(all),
+            latestDate
+        };
+    }
+
+    async function mpFetchOfficialMarket() {
+        const now = Date.now();
+        if (ploutosOfficialMarketCache &&
+            now - ploutosOfficialMarketCache.savedAt <= PLOUTOS_OFFICIAL_MARKET_CACHE_TTL_MS) {
+            return ploutosOfficialMarketCache.data;
+        }
+
+        const [taiex, tx] = await Promise.all([
+            mpFetchOfficialTaiex(),
+            mpFetchOfficialTaifexTx().catch(e => {
+                console.warn('Official TAIFEX fallback failed:', e);
+                return null;
+            })
+        ]);
+
+        if (!taiex || !tx?.front || !Number.isFinite(taiex.deal) || !Number.isFinite(tx.front.deal)) {
+            return null;
+        }
+
+        const data = {
+            taiexDeal: taiex.deal,
+            taiexChange: taiex.change,
+            taiexPct: taiex.changePct,
+            txDeal: tx.front.deal,
+            txChange: tx.front.change,
+            txPct: tx.front.changePct,
+            txAllDeal: tx.all?.deal ?? tx.front.deal,
+            txAllChange: tx.all?.change ?? tx.front.change,
+            txAllPct: tx.all?.changePct ?? tx.front.changePct,
+            nasdaqFutDeal: null,
+            nasdaqFutChange: null,
+            nasdaqFutPct: null,
+            semiFutDeal: null,
+            semiFutChange: null,
+            semiFutPct: null,
+            semiFutCode: '',
+            semiFutSession: '',
+            nikkeiFutDeal: null,
+            nikkeiFutChange: null,
+            nikkeiFutPct: null,
+            nikkeiFutCode: '',
+            nikkeiFutSession: '',
+            basis: tx.front.deal - taiex.deal,
+            updatedRaw: `TWSE ${taiex.date}｜TAIFEX ${tx.front.date} ${tx.front.contractMonth}`,
+            updatedMs: Date.now(),
+            officialMeta: {
+                taiexDate: taiex.date,
+                txDate: tx.front.date,
+                txContractMonth: tx.front.contractMonth,
+                txFrontSession: tx.front.session,
+                txAllSession: tx.all?.session || tx.front.session
+            }
+        };
+        ploutosOfficialMarketCache = {savedAt: now, data};
+        return data;
+    }
+
+    function mpRenderOfficialQuote(d) {
+        if (!d || !Number.isFinite(d.taiexDeal) || !Number.isFinite(d.txDeal)) return false;
+
+        const tv = document.getElementById('mpTaiexValue');
+        const tc = document.getElementById('mpTaiexChange');
+        const xv = document.getElementById('mpTxValue');
+        const xc = document.getElementById('mpTxChange');
+        const yxv = document.getElementById('mpYuantaTxAllValue');
+        const yxc = document.getElementById('mpYuantaTxAllChange');
+        const bb = document.getElementById('mpBasisBox');
+        const bv = document.getElementById('mpBasisValue');
+        const bl = document.getElementById('mpBasisLabel');
+
+        if (tv) tv.textContent = mpFormat(d.taiexDeal, 2);
+        if (tc) tc.textContent = Number.isFinite(d.taiexChange)
+            ? `${d.taiexChange >= 0 ? '+' : ''}${mpFormat(d.taiexChange,2)}${Number.isFinite(d.taiexPct) ? ` (${d.taiexPct >= 0 ? '+' : ''}${mpFormat(d.taiexPct,2)}%)` : ''}`
+            : 'OFFICIAL CLOSE';
+
+        if (xv) xv.textContent = mpFormat(d.txDeal, 0);
+        if (xc) xc.textContent = Number.isFinite(d.txChange)
+            ? `${d.txChange >= 0 ? '+' : ''}${mpFormat(d.txChange,0)}${Number.isFinite(d.txPct) ? ` (${d.txPct >= 0 ? '+' : ''}${mpFormat(d.txPct,2)}%)` : ''}`
+            : 'LATEST OFFICIAL';
+
+        if (yxv) yxv.textContent = mpFormat(d.txAllDeal, 0);
+        if (yxc) yxc.textContent = Number.isFinite(d.txAllChange)
+            ? `${d.txAllChange >= 0 ? '+' : ''}${mpFormat(d.txAllChange,0)}${Number.isFinite(d.txAllPct) ? ` (${d.txAllPct >= 0 ? '+' : ''}${mpFormat(d.txAllPct,2)}%)` : ''}`
+            : 'LATEST SESSION';
+
+        if (tv && tc) mpSetDirection(tv, tc, d.taiexChange || 0);
+        if (xv && xc) mpSetDirection(xv, xc, d.txChange || 0);
+        if (yxv && yxc) mpSetDirection(yxv, yxc, d.txAllChange || 0);
+
+        if (bb && bv && bl && Number.isFinite(d.basis)) {
+            bb.classList.remove('positive','negative');
+            bv.textContent = `${d.basis >= 0 ? '+' : ''}${mpFormat(d.basis,2)}`;
+            const cls = d.basis > 0 ? 'up' : d.basis < 0 ? 'down' : 'neutral';
+            bv.className = `value ${cls}`;
+            bl.className = `sub ${cls}`;
+            bl.textContent = d.basis > 0
+                ? '正價差 // OFFICIAL CLOSE'
+                : d.basis < 0
+                    ? '逆價差 // OFFICIAL CLOSE'
+                    : '平價差 // OFFICIAL CLOSE';
+            if (d.basis > 0) bb.classList.add('positive');
+            else if (d.basis < 0) bb.classList.add('negative');
+        }
+
+        const nfv = document.getElementById('mpNasdaqFutValue'), nfc = document.getElementById('mpNasdaqFutChange');
+        const sfv = document.getElementById('mpSemiFutValue'), sfc = document.getElementById('mpSemiFutChange');
+        const nkv = document.getElementById('mpNikkeiFutValue'), nkc = document.getElementById('mpNikkeiFutChange');
+        if (nfv) nfv.textContent = '--';
+        if (nfc) nfc.textContent = 'YUANTA OFFLINE';
+        if (sfv) sfv.textContent = '--';
+        if (sfc) sfc.textContent = 'YUANTA OFFLINE';
+        if (nkv) nkv.textContent = '--';
+        if (nkc) nkc.textContent = 'YUANTA OFFLINE';
+
+        const status = document.getElementById('marketPulseStatus');
+        const src = document.getElementById('mpSourceText');
+        const meta = d.officialMeta || {};
+        if (status) {
+            status.textContent =
+                `🌐 YUANTA LIVE OFFLINE｜OFFICIAL ONLINE｜TAIEX ${meta.taiexDate || '--'}｜TX ${meta.txDate || '--'} ${meta.txContractMonth || ''}`;
+        }
+        if (src) {
+            src.textContent =
+                `DATA SOURCE ｜TWSE FMTQIK + TAIFEX DailyMarketReportFut｜TX FRONT ${meta.txFrontSession || 'Official'}｜TX ALL ${meta.txAllSession || 'Official'}｜非即時`;
+        }
+        return true;
+    }
+
     function mpStaticDbAvailable() {
         return typeof MARKET_DATA !== 'undefined'
             && MARKET_DATA
@@ -3923,25 +4409,33 @@
             }
         }
 
-        // 2) STATIC MARKET DB
+        // 2) OFFICIAL ONLINE: latest completed TWSE / TAIFEX records.
+        try {
+            const official = await mpFetchOfficialMarket();
+            if (official && mpRenderOfficialQuote(official)) return false;
+        } catch (e) {
+            console.warn('Official market layer unavailable:', e);
+        }
+
+        // 3) STATIC MARKET DB failsafe
         let staticReady = mpStaticDbAvailable();
         if (!staticReady) staticReady = await mpEnsureStaticDbLoaded();
 
         if (staticReady) {
             refreshMarketPulseStatic();
             const status = document.getElementById('marketPulseStatus');
-            if (status) status.textContent = `🟡 YUANTA LIVE OFFLINE｜已切換 STATIC MARKET DB｜${status.textContent.replace(/^✅\s*/, '')}`;
+            if (status) status.textContent = `🟡 YUANTA + OFFICIAL ONLINE OFFLINE｜已切換 STATIC MARKET DB｜${status.textContent.replace(/^✅\s*/, '')}`;
             return false;
         }
 
-        // 3) Last Yuanta quote as STALE if static DB cannot be loaded.
+        // 4) Last Yuanta quote as STALE if neither official nor static data is available.
         const last = staleCandidate || ploutosLastYuantaQuote;
         if (last && mpRenderQuote(last, 'STALE')) return false;
 
-        // 4) Truly no data.
+        // 5) Truly no data.
         const status = document.getElementById('marketPulseStatus');
         const src = document.getElementById('mpSourceText');
-        if (status) status.textContent = '🔴 MARKET DATA OFFLINE｜YUANTA 與 STATIC DB 均無法取得';
+        if (status) status.textContent = '🔴 MARKET DATA OFFLINE｜YUANTA / OFFICIAL ONLINE / STATIC DB 均無法取得';
         if (src) src.textContent = 'DATA SOURCE ｜NO DATA';
         return false;
     }
