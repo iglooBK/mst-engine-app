@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.13 OFFICIAL-CACHE-INTEGRATION | Yuanta LIVE → per-card official online → static DB -->
+<!-- PLOUTOS GitHub Release: v2.9.14 US-OFFICIAL-CACHE-INTEGRATION | Yuanta LIVE → per-card official online → static DB -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -4171,11 +4171,20 @@
 
         const front = normalize(raw.front);
         const all = normalize(raw.all);
+        const nasdaq100 = normalize(raw.nasdaq100);
+        const semiconductor = normalize(raw.semiconductor);
+        const nasdaq100AfterHours = normalize(raw.nasdaq100AfterHours);
+        const semiconductorAfterHours = normalize(raw.semiconductorAfterHours);
         if (!front) return null;
 
         const data = {
             front,
             all,
+            nasdaq100,
+            semiconductor,
+            nasdaq100AfterHours,
+            semiconductorAfterHours,
+            availability: raw.availability || null,
             cacheGeneratedAtUtc: raw.generatedAtUtc || null,
             cacheSource: raw.source || 'TAIFEX DailyMarketReportFut'
         };
@@ -4187,11 +4196,7 @@
         const c=ploutosOfficialCache.jpx;
         if(c && Date.now()-c.savedAt<PLOUTOS_OFFICIAL_CACHE_TTL_MS) return c.data;
 
-        const urls = [
-            './jpx-market-latest.json',
-            'jpx-market-latest.json'
-        ];
-
+        const urls = ['./jpx-market-latest.json','jpx-market-latest.json'];
         let raw=null;
         for(const url of urls){
             try{
@@ -4201,13 +4206,11 @@
                 if(raw) break;
             }catch(e){}
         }
-        if(!raw || raw.status !== 'OK') return null;
+        if(!raw || raw.status!=='OK') return null;
 
         const n=raw.nikkei225;
         if(!n || !Number.isFinite(Number(n.settlementPrice))) return null;
 
-        // Safety guard: accept only the standard large Nikkei 225 future.
-        // Mini contracts (FUT_225M_*) and options must never reach this card.
         const issueName=String(n.issueName||'');
         if(!/^FUT_225_\d+$/.test(issueName)) return null;
 
@@ -4216,8 +4219,6 @@
             contractMonth:String(n.contractMonth||''),
             issueName,
             tradingDate:String(raw.tradingDate||''),
-            underlyingPrice:Number.isFinite(Number(n.underlyingPrice)) ? Number(n.underlyingPrice) : null,
-            daysUntilMaturity:Number.isFinite(Number(n.daysUntilMaturity)) ? Number(n.daysUntilMaturity) : null,
             generatedAtUtc:raw.generatedAtUtc||null,
             source:raw.source||'JPX Settlement Prices for Futures and Options'
         };
@@ -4227,19 +4228,14 @@
 
     function mpoRenderJpxFallback(jpx) {
         if(!jpx || !Number.isFinite(jpx.deal)) return false;
+        const v=document.getElementById('mpNikkeiFutValue');
+        const c=document.getElementById('mpNikkeiFutChange');
+        if(!v || !c) return false;
 
-        const nkv=document.getElementById('mpNikkeiFutValue');
-        const nkc=document.getElementById('mpNikkeiFutChange');
-        if(!nkv || !nkc) return false;
-
-        nkv.textContent=mpFormat(jpx.deal,0);
-        nkv.className='value neutral';
-        nkc.className='sub neutral';
-
-        const cm=jpx.contractMonth ? ` ${jpx.contractMonth}` : '';
-        const dt=jpx.tradingDate ? ` · ${jpx.tradingDate}` : '';
-        nkc.textContent=`JPX OFFICIAL SETTLEMENT${cm}${dt}`;
-
+        v.textContent=mpFormat(jpx.deal,0);
+        v.className='value neutral';
+        c.className='sub neutral';
+        c.textContent=`JPX OFFICIAL SETTLEMENT${jpx.contractMonth?` ${jpx.contractMonth}`:''}${jpx.tradingDate?` · ${jpx.tradingDate}`:''}`;
         return true;
     }
 
@@ -4304,6 +4300,8 @@
         const tv=document.getElementById('mpTaiexValue'),tc=document.getElementById('mpTaiexChange');
         const xv=document.getElementById('mpTxValue'),xc=document.getElementById('mpTxChange');
         const av=document.getElementById('mpYuantaTxAllValue'),ac=document.getElementById('mpYuantaTxAllChange');
+        const nfv=document.getElementById('mpNasdaqFutValue'),nfc=document.getElementById('mpNasdaqFutChange');
+        const sfv=document.getElementById('mpSemiFutValue'),sfc=document.getElementById('mpSemiFutChange');
         const bv=document.getElementById('mpBasisValue'),bl=document.getElementById('mpBasisLabel'),bb=document.getElementById('mpBasisBox');
 
         if(Number.isFinite(taiexDeal)){
@@ -4337,6 +4335,44 @@
         } else {
             if(av) av.textContent='--';
             if(ac) ac.textContent=tx ? 'TAIFEX 無盤後資料' : '等待元大 LIVE';
+        }
+
+        // v2.9.14 US OFFICIAL CACHE:
+        // Yuanta LIVE has already been attempted before this function is called.
+        // When Yuanta is offline, use TAIFEX-listed UNF/SXF official cache.
+        const nq = tx?.nasdaq100AfterHours || tx?.nasdaq100 || null;
+        const semi = tx?.semiconductorAfterHours || tx?.semiconductor || null;
+
+        if (nfv && nfc) {
+            if (Number.isFinite(nq?.close)) {
+                nfv.textContent = mpFormat(nq.close, 0);
+                const ch = nq.change, pc = nq.pct;
+                nfc.textContent = Number.isFinite(ch)
+                    ? `${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''} · TAIFEX UNF OFFICIAL`
+                    : `TAIFEX UNF OFFICIAL${nq.session?` · ${nq.session}`:''}`;
+                mpSetDirection(nfv,nfc,ch||0);
+            } else {
+                nfv.textContent='--';
+                nfv.className='value neutral';
+                nfc.textContent='等待元大 LIVE / UNF OFFICIAL';
+                nfc.className='sub neutral';
+            }
+        }
+
+        if (sfv && sfc) {
+            if (Number.isFinite(semi?.close)) {
+                sfv.textContent = mpFormat(semi.close, 0);
+                const ch = semi.change, pc = semi.pct;
+                sfc.textContent = Number.isFinite(ch)
+                    ? `${ch>=0?'+':''}${mpFormat(ch,0)}${Number.isFinite(pc)?` (${pc>=0?'+':''}${mpFormat(pc,2)}%)`:''} · TAIFEX SXF OFFICIAL`
+                    : `TAIFEX SXF OFFICIAL${semi.session?` · ${semi.session}`:''}`;
+                mpSetDirection(sfv,sfc,ch||0);
+            } else {
+                sfv.textContent='--';
+                sfv.className='value neutral';
+                sfc.textContent='等待元大 LIVE / SXF OFFICIAL';
+                sfc.className='sub neutral';
+            }
         }
 
         // BASIS safety:
@@ -4384,13 +4420,16 @@
         const txContract = tx?.front?.month || staticData?.txContractMonth || '';
         const cacheStamp = tx?.cacheGeneratedAtUtc ? `｜CACHE ${tx.cacheGeneratedAtUtc}` : '';
 
+        const usOfficial = Number.isFinite((tx?.nasdaq100AfterHours || tx?.nasdaq100)?.close)
+            || Number.isFinite((tx?.semiconductorAfterHours || tx?.semiconductor)?.close);
+
         if(status) {
             status.textContent =
-                `🌐 YUANTA OFFLINE｜TAIEX ${ts}${taiex?.date?` ${taiex.date}`:''}｜TX ${xs}${txFrontDate?` ${txFrontDate}`:''}${txContract?` ${txContract}`:''}`;
+                `🌐 YUANTA OFFLINE｜TAIEX ${ts}${taiex?.date?` ${taiex.date}`:''}｜TX ${xs}${txFrontDate?` ${txFrontDate}`:''}${txContract?` ${txContract}`:''}${usOfficial?'｜US TAIFEX OFFICIAL CACHE':''}`;
         }
         if(src) {
             src.textContent =
-                `DATA SOURCE ｜TAIEX ${ts}｜TX FRONT/ALL ${xs}${txAllSession?` (${txAllSession})`:''}｜BASIS ${sameOfficialDate||!bothOfficial?'CALC':'DATE GUARD'}｜非即時${cacheStamp}`;
+                `DATA SOURCE ｜TAIEX ${ts}｜TX FRONT/ALL ${xs}${txAllSession?` (${txAllSession})`:''}｜US ${usOfficial?'TAIFEX UNF/SXF OFFICIAL CACHE':'等待元大 LIVE'}｜BASIS ${sameOfficialDate||!bothOfficial?'CALC':'DATE GUARD'}｜非即時${cacheStamp}`;
         }
         return true;
     }
@@ -4458,11 +4497,9 @@
             mpoFetchJpx().catch(e => { console.warn('JPX official unavailable',e); return null; })
         ]);
 
-        // JPX is card-independent: when Yuanta LIVE is unavailable, use the
-        // official JPX settlement cache for the Japan card.
         if (officialJpx) mpoRenderJpxFallback(officialJpx);
 
-        // If either Taiwan official source succeeds, render ONCE using official + static fallback.
+        // If either official Taiwan source succeeds, render ONCE using official + static fallback.
         if (officialTaiex || officialTx) {
             if (mpoRenderIndependent(officialTaiex, officialTx, staticData)) {
                 const src=document.getElementById('mpSourceText');
