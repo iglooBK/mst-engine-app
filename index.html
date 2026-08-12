@@ -2940,7 +2940,7 @@
         }
     }
 
-    /* 📰 NEWS FEED v2.2 RELIABILITY // 跟隨目前股票，自動抓「最近 72 小時」重要新聞
+    /* 📰 NEWS FEED v2.3 CACHE RECOVERY // 跟隨目前股票，自動抓「最近 72 小時」重要新聞
        - 主要搜尋公司名稱；不足時 fallback 到「代號 + 公司名稱」與純代號
        - RSS2JSON 每個 query 最多 3 次 retry，含 timeout + 漸進 backoff
        - 每次切股 / 重整都有 request id，舊請求不會覆蓋新股票的新聞畫面
@@ -2952,7 +2952,109 @@
     const PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS = 3;
     const PLOUTOS_STOCK_NEWS_BACKOFF_MS = [350, 900];
 
+    // v2.3: last-good cache + controlled background recovery
+    const PLOUTOS_STOCK_NEWS_CACHE_PREFIX = 'ploutos.stockNews.v2.3.';
+    const PLOUTOS_STOCK_NEWS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+    const PLOUTOS_STOCK_NEWS_BACKGROUND_DELAY_MS = 4500;
+    const PLOUTOS_STOCK_NEWS_BACKGROUND_COOLDOWN_MS = 45 * 1000;
+    const PLOUTOS_STOCK_NEWS_RECOVERY_AT = new Map();
+
     const ploutosNewsSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function ploutosStockNewsCacheKey(stockCode, stockName) {
+        const identity = String(stockCode || stockName || '').trim().toUpperCase();
+        return PLOUTOS_STOCK_NEWS_CACHE_PREFIX + encodeURIComponent(identity);
+    }
+
+    function ploutosLoadStockNewsCache(stockCode, stockName) {
+        try {
+            const key = ploutosStockNewsCacheKey(stockCode, stockName);
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const cached = JSON.parse(raw);
+            const savedAt = Number(cached?.savedAt || 0);
+            if (!Array.isArray(cached?.items) || !cached.items.length) return null;
+            if (!Number.isFinite(savedAt) || (Date.now() - savedAt) > PLOUTOS_STOCK_NEWS_CACHE_TTL_MS) {
+                localStorage.removeItem(key);
+                return null;
+            }
+            return cached;
+        } catch (e) {
+            console.warn('[NEWS CACHE] read failed:', e);
+            return null;
+        }
+    }
+
+    function ploutosSaveStockNewsCache(stockCode, stockName, displayName, items) {
+        try {
+            if (!Array.isArray(items) || !items.length) return;
+            localStorage.setItem(
+                ploutosStockNewsCacheKey(stockCode, stockName),
+                JSON.stringify({
+                    savedAt: Date.now(),
+                    displayName: String(displayName || '').trim(),
+                    items: items.slice(0, 10).map(item => ({
+                        title: item?.title,
+                        link: item?.link,
+                        pubDate: item?.pubDate
+                    }))
+                })
+            );
+        } catch (e) {
+            console.warn('[NEWS CACHE] write failed:', e);
+        }
+    }
+
+    function ploutosRenderStockNewsItems(newsContainer, items, options = {}) {
+        const cached = !!options.cached;
+        const savedAt = Number(options.savedAt || 0);
+        let statusHtml = '';
+
+        if (cached) {
+            let savedText = '';
+            if (savedAt) {
+                savedText = ' · ' + new Intl.DateTimeFormat('zh-TW', {
+                    timeZone: 'Asia/Taipei',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }).format(new Date(savedAt));
+            }
+            statusHtml = `<div style="color:#f59e0b; padding:5px 8px 8px; text-align:center; font-size:.68rem; font-weight:800;">CACHED // 新聞來源暫時不穩，顯示最近成功資料${savedText} · 背景恢復中</div>`;
+        }
+
+        newsContainer.innerHTML = statusHtml + items.map((item, idx) => {
+            const pubDate = new Date(item.pubDate);
+            const timeStr = new Intl.DateTimeFormat('zh-TW', {
+                timeZone: 'Asia/Taipei',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).format(pubDate);
+            return `
+                <div class="news-item">
+                    <span class="news-no">[#${idx + 1}]</span>
+                    <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="news-title" title="${item.title}">${item.title}</a>
+                    <span class="news-date">${timeStr}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function ploutosScheduleStockNewsRecovery(portfolioName, stockCode, stockName, requestId) {
+        const key = ploutosStockNewsCacheKey(stockCode, stockName);
+        const now = Date.now();
+        const last = Number(PLOUTOS_STOCK_NEWS_RECOVERY_AT.get(key) || 0);
+        if ((now - last) < PLOUTOS_STOCK_NEWS_BACKGROUND_COOLDOWN_MS) return;
+        PLOUTOS_STOCK_NEWS_RECOVERY_AT.set(key, now);
+
+        setTimeout(() => {
+            if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return;
+            fetchStockNews(portfolioName, { backgroundRecovery: true });
+        }, PLOUTOS_STOCK_NEWS_BACKGROUND_DELAY_MS);
+    }
 
     async function ploutosFetchStockNewsQuery(query) {
         let lastError = null;
@@ -2995,7 +3097,7 @@
 
         return { ok: false, data: null, error: lastError };
     }
-    async function fetchStockNews(portfolioName) {
+    async function fetchStockNews(portfolioName, options = {}) {
         const requestId = ++PLOUTOS_STOCK_NEWS_REQUEST_ID;
         const newsContainer = document.getElementById('newsListContainer');
         const newsStockTitle = document.getElementById('newsStockTitle');
@@ -3093,26 +3195,33 @@
             .slice(0, 10);
 
         if (recentItems.length > 0) {
-            newsContainer.innerHTML = recentItems.map((item, idx) => {
-                const pubDate = new Date(item.pubDate);
-                const timeStr = new Intl.DateTimeFormat('zh-TW', {
-                    timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit',
-                    hour: '2-digit', minute: '2-digit', hour12: false
-                }).format(pubDate);
-                return `
-                    <div class="news-item">
-                        <span class="news-no">[#${idx + 1}]</span>
-                        <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="news-title" title="${item.title}">${item.title}</a>
-                        <span class="news-date">${timeStr}</span>
-                    </div>
-                `;
-            }).join('');
+            ploutosSaveStockNewsCache(stockCode, stockName, displayName, recentItems);
+            ploutosRenderStockNewsItems(newsContainer, recentItems);
             return;
         }
 
         if (!serviceSucceeded) {
             console.error('News feed unavailable:', lastError);
-            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得（已自動重試），請稍後按「重整新聞」再試。</div>`;
+
+            const cached = ploutosLoadStockNewsCache(stockCode, stockName);
+            if (cached?.items?.length) {
+                ploutosRenderStockNewsItems(newsContainer, cached.items, {
+                    cached: true,
+                    savedAt: cached.savedAt
+                });
+
+                if (!options.backgroundRecovery) {
+                    ploutosScheduleStockNewsRecovery(
+                        portfolioName,
+                        stockCode,
+                        stockName,
+                        requestId
+                    );
+                }
+                return;
+            }
+
+            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得（已自動重試）；目前也沒有可用快取，請稍後再試。</div>`;
             return;
         }
 
