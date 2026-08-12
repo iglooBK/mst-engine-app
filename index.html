@@ -2940,12 +2940,63 @@
         }
     }
 
-    /* 📰 NEWS FEED v2.1 // 跟隨目前股票，自動抓「最近 72 小時」重要新聞
-       - 主要搜尋公司名稱，不再把「代號 + 名稱」整串硬丟給 Google News
-       - 公司名稱無結果時，自動 fallback 到「代號 + 公司名稱」與純代號
-       - 合併 / 去重後只保留最近 72 小時新聞，依時間新到舊顯示 Top 10
-       - RSS2JSON 暫時異常與「今天真的沒有新聞」分開顯示，避免誤判 */
+    /* 📰 NEWS FEED v2.2 RELIABILITY // 跟隨目前股票，自動抓「最近 72 小時」重要新聞
+       - 主要搜尋公司名稱；不足時 fallback 到「代號 + 公司名稱」與純代號
+       - RSS2JSON 每個 query 最多 3 次 retry，含 timeout + 漸進 backoff
+       - 每次切股 / 重整都有 request id，舊請求不會覆蓋新股票的新聞畫面
+       - 已取得足夠近期新聞即停止額外 fallback，降低上游 API 壓力與 rate-limit 風險
+       - RSS2JSON 暫時異常與「真的沒有近期新聞」分開顯示，避免誤判 */
+
+    let PLOUTOS_STOCK_NEWS_REQUEST_ID = 0;
+    const PLOUTOS_STOCK_NEWS_TIMEOUT_MS = 5500;
+    const PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS = 3;
+    const PLOUTOS_STOCK_NEWS_BACKOFF_MS = [350, 900];
+
+    const ploutosNewsSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function ploutosFetchStockNewsQuery(query) {
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS; attempt++) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), PLOUTOS_STOCK_NEWS_TIMEOUT_MS);
+            try {
+                const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+                const response = await fetch(`${apiUrl}&_=${Date.now()}&attempt=${attempt}`, {
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`RSS2JSON HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data?.status !== 'ok') {
+                    throw new Error(data?.message || 'RSS2JSON returned non-ok status');
+                }
+
+                if (attempt > 1) {
+                    console.info(`[NEWS] recovered on retry ${attempt}/${PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS}:`, query);
+                }
+                return { ok: true, data, attempt };
+            } catch (error) {
+                lastError = error?.name === 'AbortError'
+                    ? new Error(`RSS2JSON timeout after ${PLOUTOS_STOCK_NEWS_TIMEOUT_MS}ms`)
+                    : error;
+                console.warn(`[NEWS] query attempt ${attempt}/${PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS} failed:`, query, lastError);
+
+                if (attempt < PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS) {
+                    const delay = PLOUTOS_STOCK_NEWS_BACKOFF_MS[Math.min(attempt - 1, PLOUTOS_STOCK_NEWS_BACKOFF_MS.length - 1)] || 900;
+                    await ploutosNewsSleep(delay);
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        return { ok: false, data: null, error: lastError };
+    }
     async function fetchStockNews(portfolioName) {
+        const requestId = ++PLOUTOS_STOCK_NEWS_REQUEST_ID;
         const newsContainer = document.getElementById('newsListContainer');
         const newsStockTitle = document.getElementById('newsStockTitle');
         if (!newsContainer) return;
@@ -3008,24 +3059,25 @@
         let lastError = null;
 
         for (const query of queries) {
-            try {
-                const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
-                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
-                const response = await fetch(`${apiUrl}&_=${Date.now()}`, {cache:'no-store'});
-                if (!response.ok) throw new Error(`RSS2JSON HTTP ${response.status}`);
-                const data = await response.json();
+            const result = await ploutosFetchStockNewsQuery(query);
+            if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return; // 已切到別支股票，丟棄舊請求結果
 
-                if (data?.status === 'ok') {
-                    serviceSucceeded = true;
-                    if (Array.isArray(data.items)) allItems.push(...data.items);
-                } else {
-                    lastError = new Error(data?.message || 'RSS2JSON returned non-ok status');
-                }
-            } catch (error) {
-                lastError = error;
-                console.warn('News query failed:', query, error);
+            if (result.ok) {
+                serviceSucceeded = true;
+                if (Array.isArray(result.data?.items)) allItems.push(...result.data.items);
+
+                // 近期有效新聞已足夠 Top 10 就停止 fallback，避免不必要的上游請求。
+                const recentCandidateCount = allItems.reduce((count, item) => {
+                    const publishedAt = new Date(item?.pubDate).getTime();
+                    return count + (Number.isFinite(publishedAt) && publishedAt >= newsWindowStart && publishedAt <= newsNow ? 1 : 0);
+                }, 0);
+                if (recentCandidateCount >= 10) break;
+            } else {
+                lastError = result.error || lastError;
             }
         }
+
+        if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return;
 
         // 同標題 / 同連結去重，並限定最近 72 小時。
         const seen = new Set();
@@ -3060,7 +3112,7 @@
 
         if (!serviceSucceeded) {
             console.error('News feed unavailable:', lastError);
-            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得，請稍後按「重整新聞」再試。</div>`;
+            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得（已自動重試），請稍後按「重整新聞」再試。</div>`;
             return;
         }
 
