@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.18 GLOBAL-MARKET-PULSE | v2.9.17 NEWS-72H + fixed US/TW/JP/KR global news radar -->
+<!-- PLOUTOS GitHub Release: v2.9.19 CLOUD-NEWS-BRIDGE | Stock News via Cloudflare Worker v1.2; Global Market Pulse unchanged -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -3056,76 +3056,36 @@
         }, PLOUTOS_STOCK_NEWS_BACKGROUND_DELAY_MS);
     }
 
-    async function ploutosFetchStockNewsQuery(query) {
-        let lastError = null;
+    // ☁️ PLOUTOS Cloud News Bridge v1.2 // Cloudflare Worker
+    // Browser no longer calls Google News / RSS2JSON directly.
+    const PLOUTOS_CLOUD_NEWS_BRIDGE_URL = 'https://ploutos-cloud-news-bridge.book-shu.workers.dev';
+    const PLOUTOS_STOCK_NEWS_TIMEOUT_MS = 12000;
 
-        for (let attempt = 1; attempt <= PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS; attempt++) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), PLOUTOS_STOCK_NEWS_TIMEOUT_MS);
-            try {
-                const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
-                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
-                const response = await fetch(`${apiUrl}&_=${Date.now()}&attempt=${attempt}`, {
-                    cache: 'no-store',
-                    signal: controller.signal
-                });
-
-                const httpStatus = response.status;
-                if (!response.ok) {
-                    const err = new Error(`RSS2JSON HTTP ${httpStatus}`);
-                    err.httpStatus = httpStatus;
-                    throw err;
-                }
-
-                const data = await response.json();
-                if (data?.status !== 'ok') {
-                    const err = new Error(data?.message || 'RSS2JSON returned non-ok status');
-                    err.httpStatus = httpStatus;
-                    err.apiStatus = data?.status;
-                    err.apiMessage = data?.message;
-                    throw err;
-                }
-
-                const itemCount = Array.isArray(data.items) ? data.items.length : 0;
-                console.info('[NEWS DIAG] success', {
-                    query,
-                    attempt,
-                    httpStatus,
-                    apiStatus: data?.status,
-                    itemCount
-                });
-
-                if (attempt > 1) {
-                    console.info(`[NEWS] recovered on retry ${attempt}/${PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS}:`, query);
-                }
-                return { ok: true, data, attempt, httpStatus, itemCount };
-            } catch (error) {
-                lastError = error?.name === 'AbortError'
-                    ? new Error(`RSS2JSON timeout after ${PLOUTOS_STOCK_NEWS_TIMEOUT_MS}ms`)
-                    : error;
-
-                console.warn('[NEWS DIAG] failed', {
-                    query,
-                    attempt,
-                    maxAttempts: PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS,
-                    errorName: lastError?.name,
-                    message: lastError?.message,
-                    httpStatus: lastError?.httpStatus ?? null,
-                    apiStatus: lastError?.apiStatus ?? null,
-                    apiMessage: lastError?.apiMessage ?? null
-                });
-
-                if (attempt < PLOUTOS_STOCK_NEWS_MAX_ATTEMPTS) {
-                    const delay = PLOUTOS_STOCK_NEWS_BACKOFF_MS[Math.min(attempt - 1, PLOUTOS_STOCK_NEWS_BACKOFF_MS.length - 1)] || 900;
-                    await ploutosNewsSleep(delay);
-                }
-            } finally {
-                clearTimeout(timeoutId);
+    async function ploutosFetchCloudStockNews(stockCode, stockName) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), PLOUTOS_STOCK_NEWS_TIMEOUT_MS);
+        try {
+            const params = new URLSearchParams();
+            if (stockCode) params.set('code', stockCode);
+            if (stockName) params.set('name', stockName);
+            const url = `${PLOUTOS_CLOUD_NEWS_BRIDGE_URL}/news?${params.toString()}`;
+            const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+                const detail = data?.error || `Cloud News Bridge HTTP ${response.status}`;
+                throw new Error(detail);
             }
+            return data;
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error(`Cloud News Bridge timeout after ${PLOUTOS_STOCK_NEWS_TIMEOUT_MS}ms`);
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
         }
-
-        return { ok: false, data: null, error: lastError };
     }
+
     async function fetchStockNews(portfolioName, options = {}) {
         const requestId = ++PLOUTOS_STOCK_NEWS_REQUEST_ID;
         const newsContainer = document.getElementById('newsListContainer');
@@ -3136,7 +3096,6 @@
         const codeMatch = rawInput.toUpperCase().match(/\b([0-9]{4,6}[A-Z]?)\b/);
         const stockCode = codeMatch ? codeMatch[1] : '';
 
-        // 優先使用 Master DB 的正式股票名稱；沒有資料時才從輸入文字移除代號後取得名稱。
         let stockName = '';
         try {
             const info = stockCode && typeof lookupStockInfo === 'function' ? lookupStockInfo(stockCode) : null;
@@ -3151,120 +3110,55 @@
         const displayName = [stockCode, stockName].filter(Boolean).join(' ') || rawInput;
         if (newsStockTitle) newsStockTitle.textContent = displayName || '未命名個股';
 
-        if (!displayName) {
+        if (!stockCode && !stockName) {
             newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 請先輸入有效的股票名稱或代號。</div>`;
             return;
         }
 
-        // v2.4: use ONE combined Google News query to reduce upstream calls.
-        // Example: 2324 OR 仁寶
-        const queryParts = [stockCode, stockName]
-            .map(v => String(v || '').replace(/\s+/g, ' ').trim())
-            .filter(Boolean);
+        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">☁️ [PLOUTOS CLOUD NEWS] 擷取「${displayName}」最新焦點新聞中...</div>`;
 
-        const combinedQuery = queryParts.length
-            ? queryParts.join(' OR ')
-            : rawInput;
+        try {
+            const data = await ploutosFetchCloudStockNews(stockCode, stockName);
+            if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return;
 
-        const queries = [combinedQuery];
+            const seen = new Set();
+            const items = (Array.isArray(data?.items) ? data.items : [])
+                .filter(item => {
+                    const key = String(item?.link || item?.title || '').trim();
+                    if (!key || seen.has(key)) return false;
+                    seen.add(key);
+                    return !!String(item?.title || '').trim();
+                })
+                .sort((a, b) => new Date(b?.pubDate || 0) - new Date(a?.pubDate || 0))
+                .slice(0, 10);
 
-        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [GOOGLE NEWS] 擷取「${displayName}」最近 72 小時重要新聞中...</div>`;
-
-        console.info('[NEWS DIAG] stock request', {
-            stockCode,
-            stockName,
-            displayName,
-            query: combinedQuery,
-            requestId
-        });
-
-        const taipeiDateKey = value => {
-            const d = value instanceof Date ? value : new Date(value);
-            if (isNaN(d)) return '';
-            try {
-                const parts = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'
-                }).formatToParts(d);
-                const map = Object.fromEntries(parts.map(x => [x.type, x.value]));
-                return `${map.year}-${map.month}-${map.day}`;
-            } catch (e) {
-                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            }
-        };
-
-        const newsNow = Date.now();
-        const newsWindowStart = newsNow - (72 * 60 * 60 * 1000);
-        const allItems = [];
-        let serviceSucceeded = false;
-        let lastError = null;
-
-        for (const query of queries) {
-            const result = await ploutosFetchStockNewsQuery(query);
-            if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return; // 已切到別支股票，丟棄舊請求結果
-
-            if (result.ok) {
-                serviceSucceeded = true;
-                if (Array.isArray(result.data?.items)) allItems.push(...result.data.items);
-
-                // 近期有效新聞已足夠 Top 10 就停止 fallback，避免不必要的上游請求。
-                const recentCandidateCount = allItems.reduce((count, item) => {
-                    const publishedAt = new Date(item?.pubDate).getTime();
-                    return count + (Number.isFinite(publishedAt) && publishedAt >= newsWindowStart && publishedAt <= newsNow ? 1 : 0);
-                }, 0);
-                if (recentCandidateCount >= 10) break;
-            } else {
-                lastError = result.error || lastError;
-            }
-        }
-
-        if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return;
-
-        // 同標題 / 同連結去重，並限定最近 72 小時。
-        const seen = new Set();
-        const recentItems = allItems
-            .filter(item => {
-                const key = String(item?.link || item?.title || '').trim();
-                if (!key || seen.has(key)) return false;
-                seen.add(key);
-                const publishedAt = new Date(item?.pubDate).getTime();
-                return Number.isFinite(publishedAt) && publishedAt >= newsWindowStart && publishedAt <= newsNow;
-            })
-            .sort((a, b) => new Date(b?.pubDate || 0) - new Date(a?.pubDate || 0))
-            .slice(0, 10);
-
-        if (recentItems.length > 0) {
-            ploutosSaveStockNewsCache(stockCode, stockName, displayName, recentItems);
-            ploutosRenderStockNewsItems(newsContainer, recentItems);
-            return;
-        }
-
-        if (!serviceSucceeded) {
-            console.error('News feed unavailable:', lastError);
-
-            const cached = ploutosLoadStockNewsCache(stockCode, stockName);
-            if (cached?.items?.length) {
-                ploutosRenderStockNewsItems(newsContainer, cached.items, {
-                    cached: true,
-                    savedAt: cached.savedAt
-                });
-
-                if (!options.backgroundRecovery) {
-                    ploutosScheduleStockNewsRecovery(
-                        portfolioName,
-                        stockCode,
-                        stockName,
-                        requestId
-                    );
-                }
+            if (items.length) {
+                ploutosSaveStockNewsCache(stockCode, stockName, displayName, items);
+                ploutosRenderStockNewsItems(newsContainer, items);
+                console.info('[CLOUD NEWS] success', { source: data?.source, stockCode, stockName, itemCount: items.length });
                 return;
             }
 
-            const errorMessage = String(lastError?.message || '未知錯誤');
-            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 新聞來源暫時無法取得（已自動重試）<br><span style="font-size:.7rem;color:#fca5a5;">DEBUG: ${errorMessage}</span></div>`;
-            return;
-        }
+            const cached = ploutosLoadStockNewsCache(stockCode, stockName);
+            if (cached?.items?.length) {
+                ploutosRenderStockNewsItems(newsContainer, cached.items, { cached: true, savedAt: cached.savedAt });
+                return;
+            }
 
-        newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 最近 72 小時暫無「${displayName}」的重要新聞。</div>`;
+            newsContainer.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 目前暫無「${displayName}」可顯示的焦點新聞。</div>`;
+        } catch (error) {
+            if (requestId !== PLOUTOS_STOCK_NEWS_REQUEST_ID) return;
+            console.error('[CLOUD NEWS] unavailable:', error);
+
+            const cached = ploutosLoadStockNewsCache(stockCode, stockName);
+            if (cached?.items?.length) {
+                ploutosRenderStockNewsItems(newsContainer, cached.items, { cached: true, savedAt: cached.savedAt });
+                return;
+            }
+
+            const errorMessage = String(error?.message || '未知錯誤');
+            newsContainer.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ Cloud News Bridge 暫時無法取得新聞<br><span style="font-size:.7rem;color:#fca5a5;">DEBUG: ${errorMessage}</span></div>`;
+        }
     }
 
     function refreshNews() {
