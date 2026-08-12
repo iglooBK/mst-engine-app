@@ -1,4 +1,4 @@
-<!-- PLOUTOS GitHub Release: v2.9.21 GLOBAL-CLOUD-NEWS-FINAL | Stock Cloud + Global Cloud v1.4.3 FINAL -->
+<!-- PLOUTOS GitHub Release: v2.9.22 GLOBAL-CLOUD-NEWS-FAST-PATH | Cloud News Bridge v1.4.4 -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -3171,7 +3171,7 @@
        - Endpoint: /global-news
        - Quality First: 顯示符合條件的新聞，最多 16 則，不硬湊。
        - 手動「重新整理」會使用 ?refresh=1 跳過 Worker fresh cache。 */
-    const PLOUTOS_GLOBAL_CLOUD_NEWS_TIMEOUT_MS = 15000;
+    const PLOUTOS_GLOBAL_CLOUD_NEWS_TIMEOUT_MS = 20000;
 
     async function ploutosFetchCloudGlobalNews(forceRefresh = false) {
         const controller = new AbortController();
