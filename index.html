@@ -1368,6 +1368,70 @@
             .price-structure-grid { grid-template-columns: 1fr; }
         }
 
+        /* ⚡ KD / RSI 動能指標 */
+        .momentum-section-title {
+            color: var(--accent-cyan);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.55px;
+            margin: 14px 0 8px;
+            padding-top: 10px;
+            border-top: 1px solid var(--card-border);
+        }
+        .momentum-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .momentum-card {
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 10px 12px;
+            min-width: 0;
+        }
+        .momentum-card.bullish { border-color: rgba(255, 59, 48, 0.65); }
+        .momentum-card.bearish { border-color: rgba(52, 199, 89, 0.65); }
+        .momentum-card.caution { border-color: rgba(255, 184, 0, 0.65); }
+        .momentum-card-label {
+            color: var(--text-label);
+            font-size: 0.64rem;
+            font-weight: 800;
+            letter-spacing: 0.55px;
+        }
+        .momentum-state {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 1.4;
+            margin-top: 5px;
+        }
+        .momentum-card.bullish .momentum-state { color: var(--profit-color); }
+        .momentum-card.bearish .momentum-state { color: var(--loss-color); }
+        .momentum-card.caution .momentum-state { color: #ffb800; }
+        .momentum-detail {
+            color: var(--text-muted);
+            font-size: 0.67rem;
+            line-height: 1.5;
+            min-height: 42px;
+            margin-top: 4px;
+        }
+        .momentum-chart-container {
+            position: relative;
+            height: 150px;
+            margin-top: 7px;
+        }
+        .momentum-note {
+            color: #64748b;
+            font-size: 0.62rem;
+            line-height: 1.45;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 760px) {
+            .momentum-grid { grid-template-columns: 1fr; }
+        }
+
         /* 🔔 到價提醒觸發樣式（買進=紅／賣出=綠，呼應現價高於/低於門檻的既有配色） */
         .cross-alert.alert-buy-hit {
             background: rgba(255, 59, 48, 0.12);
@@ -3682,6 +3746,22 @@
             <div class="tech-chart-container">
                 <canvas id="priceMaChart"></canvas>
             </div>
+            <div class="momentum-section-title">⚡ MOMENTUM OSCILLATORS // 動能與過熱監測</div>
+            <div class="momentum-grid">
+                <section id="kdMomentumCard" class="momentum-card" aria-live="polite">
+                    <div class="momentum-card-label">KD 9-3-3 // 隨機指標</div>
+                    <div id="kdMomentumState" class="momentum-state">⚪ 尚未分析</div>
+                    <div id="kdMomentumDetail" class="momentum-detail">等待 OHLC 歷史資料計算 K、D 與鈍化狀態。</div>
+                    <div class="momentum-chart-container"><canvas id="kdMomentumChart"></canvas></div>
+                </section>
+                <section id="rsiMomentumCard" class="momentum-card" aria-live="polite">
+                    <div class="momentum-card-label">RSI 14 // 相對強弱指標</div>
+                    <div id="rsiMomentumState" class="momentum-state">⚪ 尚未分析</div>
+                    <div id="rsiMomentumDetail" class="momentum-detail">等待收盤價資料計算動能區間與價格背離。</div>
+                    <div class="momentum-chart-container"><canvas id="rsiMomentumChart"></canvas></div>
+                </section>
+            </div>
+            <div class="momentum-note">KD／RSI 僅用來描述動能、過熱與背離；高檔鈍化不等於立即賣出，低檔鈍化或超賣也不等於已經見底。</div>
         </div>
     </div>
 
@@ -4977,6 +5057,8 @@
         renderLatestPrice(null);
         renderMAStructure(null);
         renderPriceStructureAnalysis(null);
+        renderMomentumAnalysis(null);
+        resetMomentumCharts();
 
         const cleanName = (portfolioName || '').trim();
         titleEl.textContent = cleanName || '未命名個股';
@@ -6191,6 +6273,8 @@
 
     /* 📉 技術線圖 Chart.js 實例（延遲建立） */
     let priceMaChartInstance = null;
+    let kdMomentumChartInstance = null;
+    let rsiMomentumChartInstance = null;
 
     function initPriceMaChart() {
         const ctx = document.getElementById('priceMaChart').getContext('2d');
@@ -6227,6 +6311,83 @@
                     y: { ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: '#1e2638' } }
                 }
             }
+        });
+    }
+
+    function getMomentumChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#94a3b8',
+                        boxWidth: 14,
+                        font: { family: 'JetBrains Mono', size: 9 }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 8 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
+                    grid: { color: '#1a2234' }
+                },
+                y: {
+                    min: 0, max: 100,
+                    ticks: { color: '#94a3b8', stepSize: 20, font: { family: 'JetBrains Mono', size: 8 } },
+                    grid: { color: '#1e2638' }
+                }
+            }
+        };
+    }
+
+    function initMomentumCharts() {
+        if (!kdMomentumChartInstance) {
+            const kdCtx = document.getElementById('kdMomentumChart')?.getContext('2d');
+            if (kdCtx) {
+                kdMomentumChartInstance = new Chart(kdCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { label: 'K', data: [], borderColor: '#f59e0b', borderWidth: 1.8, pointRadius: 0, tension: 0.15 },
+                            { label: 'D', data: [], borderColor: '#06b6d4', borderWidth: 1.8, pointRadius: 0, tension: 0.15 },
+                            { label: '80 過熱', data: [], borderColor: 'rgba(255,59,48,.42)', borderWidth: 1, pointRadius: 0, borderDash: [4, 4], tension: 0 },
+                            { label: '20 超賣', data: [], borderColor: 'rgba(52,199,89,.42)', borderWidth: 1, pointRadius: 0, borderDash: [4, 4], tension: 0 }
+                        ]
+                    },
+                    options: getMomentumChartOptions()
+                });
+            }
+        }
+
+        if (!rsiMomentumChartInstance) {
+            const rsiCtx = document.getElementById('rsiMomentumChart')?.getContext('2d');
+            if (rsiCtx) {
+                rsiMomentumChartInstance = new Chart(rsiCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { label: 'RSI14', data: [], borderColor: '#a855f7', borderWidth: 1.8, pointRadius: 0, tension: 0.15 },
+                            { label: '70 過熱', data: [], borderColor: 'rgba(255,59,48,.42)', borderWidth: 1, pointRadius: 0, borderDash: [4, 4], tension: 0 },
+                            { label: '30 超賣', data: [], borderColor: 'rgba(52,199,89,.42)', borderWidth: 1, pointRadius: 0, borderDash: [4, 4], tension: 0 }
+                        ]
+                    },
+                    options: getMomentumChartOptions()
+                });
+            }
+        }
+    }
+
+    function resetMomentumCharts() {
+        [kdMomentumChartInstance, rsiMomentumChartInstance].forEach(chart => {
+            if (!chart) return;
+            chart.data.labels = [];
+            chart.data.datasets.forEach(dataset => { dataset.data = []; });
+            chart.update();
         });
     }
 
@@ -6687,6 +6848,304 @@
         trendBox.className = `price-structure-item ${safe.trend?.tone || 'neutral'}`;
         trendState.textContent = safe.trend?.state || '⚪ 尚未分析';
         trendDetail.textContent = safe.trend?.detail || '';
+    }
+
+    /* ⚡ KD 9-3-3：RSV 9 日，K / D 採 1/3 平滑，初始值 50 */
+    function computeKDSeries(closes, lookback = 9) {
+        const length = Array.isArray(closes) ? closes.length : 0;
+        const kSeries = Array(length).fill(null);
+        const dSeries = Array(length).fill(null);
+        const rsvSeries = Array(length).fill(null);
+        let previousK = 50;
+        let previousD = 50;
+
+        for (let i = lookback - 1; i < length; i++) {
+            const windowBars = closes.slice(i - lookback + 1, i + 1);
+            const highs = windowBars.map(getPriceBarHigh).filter(Number.isFinite);
+            const lows = windowBars.map(getPriceBarLow).filter(Number.isFinite);
+            const close = Number(closes[i]?.close);
+            if (highs.length !== lookback || lows.length !== lookback || !Number.isFinite(close)) continue;
+
+            const highest = Math.max(...highs);
+            const lowest = Math.min(...lows);
+            const rsv = highest === lowest ? 50 : Math.max(0, Math.min(100, ((close - lowest) / (highest - lowest)) * 100));
+            const k = (2 * previousK + rsv) / 3;
+            const d = (2 * previousD + k) / 3;
+            rsvSeries[i] = rsv;
+            kSeries[i] = k;
+            dSeries[i] = d;
+            previousK = k;
+            previousD = d;
+        }
+        return { kSeries, dSeries, rsvSeries };
+    }
+
+    /* ⚡ RSI14：Wilder smoothing */
+    function computeRSISeries(closes, period = 14) {
+        const length = Array.isArray(closes) ? closes.length : 0;
+        const rsiSeries = Array(length).fill(null);
+        if (length <= period) return rsiSeries;
+
+        let gainSum = 0;
+        let lossSum = 0;
+        for (let i = 1; i <= period; i++) {
+            const current = Number(closes[i]?.close);
+            const previous = Number(closes[i - 1]?.close);
+            if (!Number.isFinite(current) || !Number.isFinite(previous)) return rsiSeries;
+            const change = current - previous;
+            if (change > 0) gainSum += change;
+            else lossSum += Math.abs(change);
+        }
+
+        let averageGain = gainSum / period;
+        let averageLoss = lossSum / period;
+        const toRSI = (gain, loss) => {
+            if (gain === 0 && loss === 0) return 50;
+            if (loss === 0) return 100;
+            if (gain === 0) return 0;
+            return 100 - (100 / (1 + gain / loss));
+        };
+        rsiSeries[period] = toRSI(averageGain, averageLoss);
+
+        for (let i = period + 1; i < length; i++) {
+            const current = Number(closes[i]?.close);
+            const previous = Number(closes[i - 1]?.close);
+            if (!Number.isFinite(current) || !Number.isFinite(previous)) continue;
+            const change = current - previous;
+            const gain = Math.max(0, change);
+            const loss = Math.max(0, -change);
+            averageGain = ((averageGain * (period - 1)) + gain) / period;
+            averageLoss = ((averageLoss * (period - 1)) + loss) / period;
+            rsiSeries[i] = toRSI(averageGain, averageLoss);
+        }
+        return rsiSeries;
+    }
+
+    function countTrailingKDZone(kSeries, dSeries, endIndex, predicate) {
+        let count = 0;
+        for (let i = endIndex; i >= 0; i--) {
+            const k = kSeries[i], d = dSeries[i];
+            if (!Number.isFinite(k) || !Number.isFinite(d) || !predicate(k, d)) break;
+            count++;
+        }
+        return count;
+    }
+
+    function detectRecentKDCross(kSeries, dSeries, closes, scanDays = 10) {
+        const start = Math.max(1, kSeries.length - scanDays);
+        for (let i = kSeries.length - 1; i >= start; i--) {
+            const previousK = kSeries[i - 1], previousD = dSeries[i - 1];
+            const currentK = kSeries[i], currentD = dSeries[i];
+            if (![previousK, previousD, currentK, currentD].every(Number.isFinite)) continue;
+            const zone = currentK >= 80 && currentD >= 80 ? 'high' : currentK <= 20 && currentD <= 20 ? 'low' : 'middle';
+            const daysAgo = kSeries.length - 1 - i;
+            if (previousK <= previousD && currentK > currentD) {
+                return { type: 'golden', zone, daysAgo, dateStr: closes[i]?.dateStr };
+            }
+            if (previousK >= previousD && currentK < currentD) {
+                return { type: 'death', zone, daysAgo, dateStr: closes[i]?.dateStr };
+            }
+        }
+        return null;
+    }
+
+    function analyzeKDIndicator(closes, kdSeries = null) {
+        const series = kdSeries || computeKDSeries(closes);
+        const lastIndex = series.kSeries.length - 1;
+        const k = series.kSeries[lastIndex];
+        const d = series.dSeries[lastIndex];
+        if (!Number.isFinite(k) || !Number.isFinite(d)) {
+            return { tone: 'neutral', state: '⚪ KD 資料不足', detail: '至少需要 9 根有效 OHLC K 棒。', ...series };
+        }
+
+        const highStreak = countTrailingKDZone(series.kSeries, series.dSeries, lastIndex, (kv, dv) => kv >= 80 && dv >= 80);
+        const lowStreak = countTrailingKDZone(series.kSeries, series.dSeries, lastIndex, (kv, dv) => kv <= 20 && dv <= 20);
+        const previousHighStreak = countTrailingKDZone(series.kSeries, series.dSeries, lastIndex - 1, (kv, dv) => kv >= 80 && dv >= 80);
+        const previousLowStreak = countTrailingKDZone(series.kSeries, series.dSeries, lastIndex - 1, (kv, dv) => kv <= 20 && dv <= 20);
+        const exitedHighDulling = previousHighStreak >= 3 && highStreak === 0;
+        const exitedLowDulling = previousLowStreak >= 3 && lowStreak === 0;
+        const cross = detectRecentKDCross(series.kSeries, series.dSeries, closes, 10);
+        const valueText = `K ${formatNumber(k, 1)}／D ${formatNumber(d, 1)}`;
+        let tone = 'neutral';
+        let state = `⚪ KD 中性｜${valueText}`;
+        let explanation = k > d ? 'K 位於 D 之上，短線動能相對偏強。' : k < d ? 'K 位於 D 之下，短線動能相對偏弱。' : 'K 與 D 接近，短線方向尚未明確。';
+
+        if (highStreak >= 3 && cross?.type === 'death' && cross.daysAgo === 0) {
+            tone = 'caution';
+            state = `🟡 高檔鈍化轉弱｜第 ${highStreak} 日｜${valueText}`;
+            explanation = 'KD 仍在 80 以上，但今日 K 已下穿 D，強勢動能開始降溫。';
+        } else if (lowStreak >= 3 && cross?.type === 'golden' && cross.daysAgo === 0) {
+            tone = 'caution';
+            state = `🟡 低檔鈍化回升｜第 ${lowStreak} 日｜${valueText}`;
+            explanation = 'KD 仍在 20 以下，但今日 K 已上穿 D，弱勢動能開始修復。';
+        } else if (highStreak >= 3) {
+            tone = 'bullish';
+            state = `🔴 KD 高檔鈍化第 ${highStreak} 日｜${valueText}`;
+            explanation = 'K、D 連續維持 80 以上，代表強勢動能延續；鈍化本身不等於立即反轉。';
+        } else if (lowStreak >= 3) {
+            tone = 'bearish';
+            state = `🟢 KD 低檔鈍化第 ${lowStreak} 日｜${valueText}`;
+            explanation = 'K、D 連續維持 20 以下，代表弱勢動能延續；鈍化本身不代表已經見底。';
+        } else if (exitedHighDulling) {
+            tone = 'caution';
+            state = `🟡 KD 脫離高檔鈍化｜${valueText}`;
+            explanation = `前一交易日以前曾連續 ${previousHighStreak} 日高檔鈍化，目前至少一條線已跌回 80 以下。`;
+        } else if (exitedLowDulling) {
+            tone = 'caution';
+            state = `🟡 KD 脫離低檔鈍化｜${valueText}`;
+            explanation = `前一交易日以前曾連續 ${previousLowStreak} 日低檔鈍化，目前至少一條線已回到 20 以上。`;
+        } else if (k >= 80 && d >= 80) {
+            tone = 'caution';
+            state = `🟡 KD 進入高檔過熱區｜${valueText}`;
+            explanation = `K、D 位於 80 以上，目前連續 ${highStreak} 日，尚未達到 3 日鈍化確認。`;
+        } else if (k <= 20 && d <= 20) {
+            tone = 'caution';
+            state = `🟡 KD 進入低檔超賣區｜${valueText}`;
+            explanation = `K、D 位於 20 以下，目前連續 ${lowStreak} 日，尚未達到 3 日鈍化確認。`;
+        } else if (k > d) {
+            tone = 'bullish';
+            state = `🔴 KD 動能偏強｜${valueText}`;
+        } else if (k < d) {
+            tone = 'bearish';
+            state = `🟢 KD 動能偏弱｜${valueText}`;
+        }
+
+        let crossText = '最近 10 個交易日無 KD 交叉。';
+        if (cross) {
+            const when = cross.daysAgo === 0 ? '今日' : `${cross.daysAgo} 個交易日前`;
+            const zoneText = cross.zone === 'high' ? '高檔' : cross.zone === 'low' ? '低檔' : '中間區';
+            crossText = `${when}${zoneText}${cross.type === 'golden' ? '黃金交叉（K 上穿 D）' : '死亡交叉（K 下穿 D）'}。`;
+        }
+        return { tone, state, detail: `${explanation}${crossText}`, cross, highStreak, lowStreak, ...series };
+    }
+
+    function analyzeRSIIndicator(closes, rsiSeries = null) {
+        const series = rsiSeries || computeRSISeries(closes, 14);
+        const lastIndex = series.length - 1;
+        const rsi = series[lastIndex];
+        if (!Number.isFinite(rsi)) {
+            return { tone: 'neutral', state: '⚪ RSI14 資料不足', detail: '至少需要 15 個有效收盤價。', rsiSeries: series };
+        }
+
+        const swings = detectConfirmedPriceSwings(closes, 2);
+        const highs = swings.highs.slice(-2);
+        const lows = swings.lows.slice(-2);
+        const latestClose = Number(closes[lastIndex]?.close);
+        const recentRanges = closes.slice(-20).map(bar => getPriceBarHigh(bar) - getPriceBarLow(bar)).filter(Number.isFinite);
+        const avgRange = recentRanges.length ? recentRanges.reduce((sum, value) => sum + value, 0) / recentRanges.length : 0;
+        const priceTolerance = Math.max(Math.abs(latestClose || 0) * 0.003, avgRange * 0.25);
+        const RSI_DIVERGENCE_MIN_POINTS = 2;
+
+        let topDivergence = null;
+        if (highs.length === 2) {
+            const firstRSI = series[highs[0].index];
+            const secondRSI = series[highs[1].index];
+            if (Number.isFinite(firstRSI) && Number.isFinite(secondRSI) &&
+                highs[1].value > highs[0].value + priceTolerance &&
+                secondRSI <= firstRSI - RSI_DIVERGENCE_MIN_POINTS) {
+                topDivergence = { first: highs[0], second: highs[1], firstRSI, secondRSI };
+            }
+        }
+
+        let bottomDivergence = null;
+        if (lows.length === 2) {
+            const firstRSI = series[lows[0].index];
+            const secondRSI = series[lows[1].index];
+            if (Number.isFinite(firstRSI) && Number.isFinite(secondRSI) &&
+                lows[1].value < lows[0].value - priceTolerance &&
+                secondRSI >= firstRSI + RSI_DIVERGENCE_MIN_POINTS) {
+                bottomDivergence = { first: lows[0], second: lows[1], firstRSI, secondRSI };
+            }
+        }
+
+        if (topDivergence) {
+            return {
+                tone: 'caution', state: `🟡 RSI 頂背離｜RSI14 ${formatNumber(rsi, 1)}`,
+                detail: `股價高點由 ${formatSwingDate(topDivergence.first.dateStr)} $${formatNumber(topDivergence.first.value, 2)} 升至 ${formatSwingDate(topDivergence.second.dateStr)} $${formatNumber(topDivergence.second.value, 2)}，但 RSI 由 ${formatNumber(topDivergence.firstRSI, 1)} 降至 ${formatNumber(topDivergence.secondRSI, 1)}；上漲動能未同步創高。`,
+                divergence: 'top', rsiSeries: series
+            };
+        }
+        if (bottomDivergence) {
+            return {
+                tone: 'caution', state: `🟡 RSI 底背離｜RSI14 ${formatNumber(rsi, 1)}`,
+                detail: `股價低點由 ${formatSwingDate(bottomDivergence.first.dateStr)} $${formatNumber(bottomDivergence.first.value, 2)} 降至 ${formatSwingDate(bottomDivergence.second.dateStr)} $${formatNumber(bottomDivergence.second.value, 2)}，但 RSI 由 ${formatNumber(bottomDivergence.firstRSI, 1)} 升至 ${formatNumber(bottomDivergence.secondRSI, 1)}；下跌動能未同步加深。`,
+                divergence: 'bottom', rsiSeries: series
+            };
+        }
+
+        let tone = 'neutral';
+        let state = `⚪ RSI14 中性｜${formatNumber(rsi, 1)}`;
+        let detail = 'RSI 位於 40～60，中短期動能相對平衡；目前未偵測到確認後的頂背離或底背離。';
+        if (rsi >= 80) {
+            tone = 'caution'; state = `🟡 RSI14 極度過熱｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 已達 80 以上，動能非常強但過熱程度升高；目前未偵測到確認後的頂背離。';
+        } else if (rsi >= 70) {
+            tone = 'caution'; state = `🟡 RSI14 高檔過熱｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 已達 70 以上，動能偏強且進入過熱區；目前未偵測到確認後的頂背離。';
+        } else if (rsi >= 60) {
+            tone = 'bullish'; state = `🔴 RSI14 動能偏強｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 位於 60～70，動能偏強但尚未進入高檔過熱區；目前未偵測到確認後的頂背離。';
+        } else if (rsi <= 20) {
+            tone = 'caution'; state = `🟡 RSI14 極度超賣｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 已降至 20 以下，動能非常弱但超賣程度升高；目前未偵測到確認後的底背離。';
+        } else if (rsi <= 30) {
+            tone = 'caution'; state = `🟡 RSI14 低檔超賣｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 已降至 30 以下，動能偏弱且進入超賣區；目前未偵測到確認後的底背離。';
+        } else if (rsi <= 40) {
+            tone = 'bearish'; state = `🟢 RSI14 動能偏弱｜${formatNumber(rsi, 1)}`;
+            detail = 'RSI 位於 30～40，動能偏弱但尚未進入低檔超賣區；目前未偵測到確認後的底背離。';
+        }
+        return { tone, state, detail, divergence: null, rsiSeries: series };
+    }
+
+    function analyzeMomentumIndicators(closes) {
+        const kdSeries = computeKDSeries(closes, 9);
+        const rsiSeries = computeRSISeries(closes, 14);
+        return {
+            kd: analyzeKDIndicator(closes, kdSeries),
+            rsi: analyzeRSIIndicator(closes, rsiSeries)
+        };
+    }
+
+    function renderMomentumAnalysis(momentum) {
+        const kdCard = document.getElementById('kdMomentumCard');
+        const kdState = document.getElementById('kdMomentumState');
+        const kdDetail = document.getElementById('kdMomentumDetail');
+        const rsiCard = document.getElementById('rsiMomentumCard');
+        const rsiState = document.getElementById('rsiMomentumState');
+        const rsiDetail = document.getElementById('rsiMomentumDetail');
+        if (!kdCard || !kdState || !kdDetail || !rsiCard || !rsiState || !rsiDetail) return;
+
+        const safe = momentum || {
+            kd: { tone: 'neutral', state: '⚪ 尚未分析', detail: '等待 OHLC 歷史資料計算 K、D 與鈍化狀態。' },
+            rsi: { tone: 'neutral', state: '⚪ 尚未分析', detail: '等待收盤價資料計算動能區間與價格背離。' }
+        };
+        kdCard.className = `momentum-card ${safe.kd?.tone || 'neutral'}`;
+        kdState.textContent = safe.kd?.state || '⚪ 尚未分析';
+        kdDetail.textContent = safe.kd?.detail || '';
+        rsiCard.className = `momentum-card ${safe.rsi?.tone || 'neutral'}`;
+        rsiState.textContent = safe.rsi?.state || '⚪ 尚未分析';
+        rsiDetail.textContent = safe.rsi?.detail || '';
+    }
+
+    function updateMomentumCharts(closes, momentum) {
+        initMomentumCharts();
+        const labels = closes.map(item => String(item.dateStr || '').slice(5));
+        if (kdMomentumChartInstance) {
+            kdMomentumChartInstance.data.labels = labels;
+            kdMomentumChartInstance.data.datasets[0].data = momentum.kd.kSeries;
+            kdMomentumChartInstance.data.datasets[1].data = momentum.kd.dSeries;
+            kdMomentumChartInstance.data.datasets[2].data = labels.map(() => 80);
+            kdMomentumChartInstance.data.datasets[3].data = labels.map(() => 20);
+            kdMomentumChartInstance.update();
+        }
+        if (rsiMomentumChartInstance) {
+            rsiMomentumChartInstance.data.labels = labels;
+            rsiMomentumChartInstance.data.datasets[0].data = momentum.rsi.rsiSeries;
+            rsiMomentumChartInstance.data.datasets[1].data = labels.map(() => 70);
+            rsiMomentumChartInstance.data.datasets[2].data = labels.map(() => 30);
+            rsiMomentumChartInstance.update();
+        }
     }
 
     /* 台股漲跌停 UI 使用「制度價格」判斷：
@@ -8159,6 +8618,7 @@
         const ma20Data = computeMASeries(closes, 20);
         const ma60Data = computeMASeries(closes, 60);
         const priceStructure = analyzePriceStructure(closes);
+        const momentum = analyzeMomentumIndicators(closes);
 
         priceMaChartInstance.data.labels = labels;
         priceMaChartInstance.data.datasets[0].data = closeData;
@@ -8180,6 +8640,8 @@
         const crossInfo = detectCross(closes);
         renderCrossAlert(crossInfo);
         renderPriceStructureAnalysis(priceStructure);
+        renderMomentumAnalysis(momentum);
+        updateMomentumCharts(closes, momentum);
     }
 
 
