@@ -1255,6 +1255,42 @@
         .ma-bias.above { color: var(--profit-color); }
         .ma-bias.below { color: var(--loss-color); }
 
+        /* 🧭 四線均線結構：與近期交叉事件分開顯示 */
+        .ma-structure-alert {
+            margin-top: 10px;
+            border-radius: 4px;
+            padding: 10px 12px;
+            border: 1px solid var(--card-border);
+            background: #0d131f;
+        }
+        .ma-structure-alert .ma-structure-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.35px;
+        }
+        .ma-structure-alert .ma-structure-detail {
+            margin-top: 4px;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            line-height: 1.55;
+        }
+        .ma-structure-alert.bullish {
+            background: rgba(255, 59, 48, 0.09);
+            border-color: rgba(255, 59, 48, 0.7);
+        }
+        .ma-structure-alert.bullish .ma-structure-title { color: var(--profit-color); }
+        .ma-structure-alert.bearish {
+            background: rgba(52, 199, 89, 0.09);
+            border-color: rgba(52, 199, 89, 0.7);
+        }
+        .ma-structure-alert.bearish .ma-structure-title { color: var(--loss-color); }
+        .ma-structure-alert.caution {
+            background: rgba(255, 184, 0, 0.08);
+            border-color: rgba(255, 184, 0, 0.7);
+        }
+        .ma-structure-alert.caution .ma-structure-title { color: #ffb800; }
+        .ma-structure-alert.neutral .ma-structure-title { color: var(--text-muted); }
+
         /* 🔀 黃金/死亡交叉提示橫幅 */
         .cross-alert {
             border-radius: 4px;
@@ -3541,6 +3577,10 @@
             <div class="order-flow-title">買賣力道 // ORDER FLOW</div>
             <div id="maOrderFlowBody" class="order-flow-empty">等待元大內外盤資料...</div>
         </div>
+        <div id="maStructureAlert" class="ma-structure-alert neutral" aria-live="polite">
+            <div id="maStructureTitle" class="ma-structure-title">⚪ 均線結構尚未計算</div>
+            <div id="maStructureDetail" class="ma-structure-detail">完成 MA5／MA10／MA20／MA60 計算後，將顯示目前的均線排列、方向與收斂／發散狀態。</div>
+        </div>
         <div class="ma-grid">
             <div class="ma-item">
                 <label>5日線 // MA5</label>
@@ -3564,7 +3604,7 @@
             </div>
         </div>
         <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 8px; letter-spacing: 0.3px;">
-            數字顏色：<span style="color: var(--profit-color); font-weight:700;">紅</span>=股價在均線之上　<span style="color: var(--loss-color); font-weight:700;">綠</span>=股價在均線之下　｜　箭頭：<span style="color: var(--profit-color); font-weight:700;">▲紅</span>=均線較前一日上揚　<span style="color: var(--loss-color); font-weight:700;">▼綠</span>=均線較前一日下彎　｜　括號內為乖離率(現價偏離均線幅度)
+            數字顏色：<span style="color: var(--profit-color); font-weight:700;">紅</span>=股價在均線之上　<span style="color: var(--loss-color); font-weight:700;">綠</span>=股價在均線之下　｜　箭頭：<span style="color: var(--profit-color); font-weight:700;">▲紅</span>=連續兩日有效上揚　<span style="color: var(--loss-color); font-weight:700;">▼綠</span>=連續兩日有效下彎　▬=走平／方向未確認　｜　括號內為乖離率(現價偏離均線幅度)
         </div>
     </div>
 
@@ -4764,7 +4804,7 @@
             const el = document.getElementById(valueIds[key]);
             const biasEl = document.getElementById(biasIds[key]);
             const val = calcSMAAt(closes, period, 0);
-            const prevVal = calcSMAAt(closes, period, 1);
+            const slopeState = getMASlopeState(closes, period);
 
             if (val === null) {
                 el.textContent = '資料不足';
@@ -4791,17 +4831,17 @@
 
             let arrowChar = '▬';
             let arrowColor = 'var(--neutral-color)';
-            if (prevVal !== null) {
-                if (val > prevVal) {
-                    arrowChar = '▲';
-                    arrowColor = 'var(--profit-color)';
-                } else if (val < prevVal) {
-                    arrowChar = '▼';
-                    arrowColor = 'var(--loss-color)';
-                }
+            if (slopeState.direction === 'up') {
+                arrowChar = '▲';
+                arrowColor = 'var(--profit-color)';
+            } else if (slopeState.direction === 'down') {
+                arrowChar = '▼';
+                arrowColor = 'var(--loss-color)';
             }
             el.innerHTML = `$${formatNumber(val, 2)} <span style="color:${arrowColor}; font-size:0.8em;">${arrowChar}</span>`;
         });
+
+        renderMAStructure(computeMAStructure(closes));
 
         if (statusEl) {
             if (liveMeta) {
@@ -4872,6 +4912,7 @@
             if (el) el.textContent = '';
         });
         renderLatestPrice(null);
+        renderMAStructure(null);
 
         const cleanName = (portfolioName || '').trim();
         titleEl.textContent = cleanName || '未命名個股';
@@ -6119,6 +6160,227 @@
     /* 📉 計算完整 MA 序列 (每一天都算一次均線值，供畫圖與交叉偵測使用) */
     function computeMASeries(closes, period) {
         return closes.map((item, idx) => calcSMAAt(closes, period, closes.length - 1 - idx));
+    }
+
+    /* 🧭 四線均線結構引擎
+       - 結構：MA5 / MA10 / MA20 / MA60 的相對順序
+       - 方向：連續兩個交易日達到 0.01% 才算有效上揚 / 下彎
+       - 收斂 / 發散：四線標準化間距連續兩日同方向變化
+       此引擎只負責說明目前狀態，不直接產生買進或賣出指令。 */
+    const MA_STRUCTURE_SLOPE_THRESHOLD_PCT = 0.01;
+    const MA_STRUCTURE_SPREAD_CHANGE_PCT_POINT = 0.02;
+    const MA_STRUCTURE_TANGLED_SPREAD_PCT = 2.0;
+
+    function getMASlopeState(closes, period, offset = 0) {
+        const value = calcSMAAt(closes, period, offset);
+        const prev = calcSMAAt(closes, period, offset + 1);
+        const prev2 = calcSMAAt(closes, period, offset + 2);
+        if (![value, prev, prev2].every(Number.isFinite) || prev === 0 || prev2 === 0) {
+            return { value, prev, prev2, direction: 'unknown', slopePct: null, prevSlopePct: null };
+        }
+
+        const slopePct = ((value - prev) / prev) * 100;
+        const prevSlopePct = ((prev - prev2) / prev2) * 100;
+        let direction = 'flat';
+        if (slopePct >= MA_STRUCTURE_SLOPE_THRESHOLD_PCT &&
+            prevSlopePct >= MA_STRUCTURE_SLOPE_THRESHOLD_PCT) {
+            direction = 'up';
+        } else if (slopePct <= -MA_STRUCTURE_SLOPE_THRESHOLD_PCT &&
+                   prevSlopePct <= -MA_STRUCTURE_SLOPE_THRESHOLD_PCT) {
+            direction = 'down';
+        }
+        return { value, prev, prev2, direction, slopePct, prevSlopePct };
+    }
+
+    function getMANormalizedSpreadPct(closes, offset = 0) {
+        const values = [5, 10, 20, 60].map(period => calcSMAAt(closes, period, offset));
+        if (!values.every(Number.isFinite)) return null;
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        if (!Number.isFinite(mean) || mean === 0) return null;
+        return ((Math.max(...values) - Math.min(...values)) / mean) * 100;
+    }
+
+    function computeMAStructure(closes) {
+        if (!Array.isArray(closes) || closes.length < 62) {
+            return {
+                key: 'insufficient', tone: 'neutral',
+                title: '⚪ 均線結構資料不足',
+                detail: '至少需要 62 個交易日，才能同時確認 MA60 與連續兩日的均線方向。'
+            };
+        }
+
+        const rows = [5, 10, 20, 60].map(period => ({
+            period,
+            ...getMASlopeState(closes, period)
+        }));
+        if (!rows.every(row => Number.isFinite(row.value))) {
+            return {
+                key: 'insufficient', tone: 'neutral',
+                title: '⚪ 均線結構資料不足',
+                detail: 'MA5／MA10／MA20／MA60 尚未全部計算完成。'
+            };
+        }
+
+        const [ma5, ma10, ma20, ma60] = rows.map(row => row.value);
+        const latestPrice = Number(closes[closes.length - 1]?.close);
+        const directions = rows.map(row => row.direction);
+        const upCount = directions.filter(direction => direction === 'up').length;
+        const downCount = directions.filter(direction => direction === 'down').length;
+        const flatCount = directions.filter(direction => direction === 'flat').length;
+        const allUp = upCount === 4;
+        const allDown = downCount === 4;
+        const bullishOrder = ma5 > ma10 && ma10 > ma20 && ma20 > ma60;
+        const bearishOrder = ma5 < ma10 && ma10 < ma20 && ma20 < ma60;
+        const priceAboveAll = Number.isFinite(latestPrice) && latestPrice > Math.max(ma5, ma10, ma20, ma60);
+        const priceBelowAll = Number.isFinite(latestPrice) && latestPrice < Math.min(ma5, ma10, ma20, ma60);
+
+        const spreadNow = getMANormalizedSpreadPct(closes, 0);
+        const spreadPrev = getMANormalizedSpreadPct(closes, 1);
+        const spreadPrev2 = getMANormalizedSpreadPct(closes, 2);
+        const hasSpreadHistory = [spreadNow, spreadPrev, spreadPrev2].every(Number.isFinite);
+        const widening = hasSpreadHistory &&
+            spreadNow - spreadPrev >= MA_STRUCTURE_SPREAD_CHANGE_PCT_POINT &&
+            spreadPrev - spreadPrev2 >= MA_STRUCTURE_SPREAD_CHANGE_PCT_POINT;
+        const converging = hasSpreadHistory &&
+            spreadPrev - spreadNow >= MA_STRUCTURE_SPREAD_CHANGE_PCT_POINT &&
+            spreadPrev2 - spreadPrev >= MA_STRUCTURE_SPREAD_CHANGE_PCT_POINT;
+        const tangled = Number.isFinite(spreadNow) && spreadNow <= MA_STRUCTURE_TANGLED_SPREAD_PCT;
+        const spreadText = Number.isFinite(spreadNow) ? `目前四線最大間距約 ${formatNumber(spreadNow, 2)}%。` : '';
+
+        if (bullishOrder && allUp && priceAboveAll) {
+            return {
+                key: 'strong_bullish_alignment', tone: 'bullish',
+                title: '🔴 強勢多頭排列',
+                detail: `現價位於四條均線之上，且 MA5 > MA10 > MA20 > MA60、四線同步上揚。${spreadText}`
+            };
+        }
+        if (bearishOrder && allDown && priceBelowAll) {
+            return {
+                key: 'strong_bearish_alignment', tone: 'bearish',
+                title: '🟢 強勢空頭排列',
+                detail: `現價位於四條均線之下，且 MA5 < MA10 < MA20 < MA60、四線同步下彎。${spreadText}`
+            };
+        }
+        if (bullishOrder && widening) {
+            return {
+                key: 'bullish_expansion', tone: 'bullish',
+                title: '🔴 多頭發散',
+                detail: `均線維持 MA5 > MA10 > MA20 > MA60，四線間距連續擴大，偏多動能正在增強。${spreadText}`
+            };
+        }
+        if (bullishOrder && converging) {
+            return {
+                key: 'bullish_convergence', tone: 'caution',
+                title: '🟡 多頭收斂',
+                detail: `均線仍為多頭排列，但四線間距連續縮小，短期動能正在降溫。${spreadText}`
+            };
+        }
+        if (bearishOrder && widening) {
+            return {
+                key: 'bearish_expansion', tone: 'bearish',
+                title: '🟢 空頭發散',
+                detail: `均線維持 MA5 < MA10 < MA20 < MA60，四線間距連續擴大，偏弱動能正在增強。${spreadText}`
+            };
+        }
+        if (bearishOrder && converging) {
+            return {
+                key: 'bearish_convergence', tone: 'caution',
+                title: '🟡 空頭收斂',
+                detail: `均線仍為空頭排列，但四線間距連續縮小，下跌動能可能正在減緩。${spreadText}`
+            };
+        }
+        if (bullishOrder) {
+            return {
+                key: 'bullish_alignment', tone: 'bullish',
+                title: '🔴 均線多頭排列',
+                detail: `目前為 MA5 > MA10 > MA20 > MA60；${allUp ? '四線同步上揚' : '部分均線尚未同步上揚'}。${spreadText}`
+            };
+        }
+        if (bearishOrder) {
+            return {
+                key: 'bearish_alignment', tone: 'bearish',
+                title: '🟢 均線空頭排列',
+                detail: `目前為 MA5 < MA10 < MA20 < MA60；${allDown ? '四線同步下彎' : '部分均線尚未同步下彎'}。${spreadText}`
+            };
+        }
+        if (ma20 > ma60 && ma5 < ma10) {
+            return {
+                key: 'bull_trend_pullback', tone: 'caution',
+                title: '🟡 多頭趨勢中的短線回檔',
+                detail: 'MA20 仍在 MA60 之上，但 MA5 已低於 MA10；中長期結構尚偏多，短線正在回測。'
+            };
+        }
+        if (ma20 < ma60 && ma5 > ma10) {
+            return {
+                key: 'bear_trend_rebound', tone: 'caution',
+                title: '🟡 空頭趨勢中的短線反彈',
+                detail: 'MA20 仍在 MA60 之下，但 MA5 已高於 MA10；短線率先轉強，中長期尚未確認翻多。'
+            };
+        }
+        if (ma5 > ma10 && ma10 > ma20 && ma20 <= ma60) {
+            return {
+                key: 'bullish_forming', tone: 'caution',
+                title: '🟡 多頭排列形成中',
+                detail: 'MA5 > MA10 > MA20，短中期均線已轉強；仍等待 MA20 突破 MA60，確認完整多頭排列。'
+            };
+        }
+        if (ma5 < ma10 && ma10 < ma20 && ma20 >= ma60) {
+            return {
+                key: 'bearish_forming', tone: 'caution',
+                title: '🟡 空頭排列形成中',
+                detail: 'MA5 < MA10 < MA20，短中期均線已轉弱；仍等待 MA20 跌破 MA60，確認完整空頭排列。'
+            };
+        }
+        if (tangled) {
+            return {
+                key: 'tangled', tone: 'neutral',
+                title: '⚪ 均線糾結',
+                detail: `四條均線集中在狹窄範圍且排列交錯，多空方向尚未明確。${spreadText}`
+            };
+        }
+        if (allUp) {
+            return {
+                key: 'synchronized_up', tone: 'bullish',
+                title: '🔴 四線同步上揚',
+                detail: 'MA5／MA10／MA20／MA60 全部有效上揚，但排列尚未完全符合多頭排列。'
+            };
+        }
+        if (allDown) {
+            return {
+                key: 'synchronized_down', tone: 'bearish',
+                title: '🟢 四線同步下彎',
+                detail: 'MA5／MA10／MA20／MA60 全部有效下彎，但排列尚未完全符合空頭排列。'
+            };
+        }
+        if (flatCount >= 3) {
+            return {
+                key: 'flat', tone: 'neutral',
+                title: '⚪ 均線走平',
+                detail: `至少三條均線方向尚未確認，趨勢動能不足，目前偏向整理。${spreadText}`
+            };
+        }
+
+        return {
+            key: 'mixed', tone: 'caution',
+            title: '🟡 均線結構轉換中',
+            detail: `四條均線方向與排列尚未形成一致結構，短中長期訊號互有分歧。${spreadText}`
+        };
+    }
+
+    function renderMAStructure(structure) {
+        const box = document.getElementById('maStructureAlert');
+        const titleEl = document.getElementById('maStructureTitle');
+        const detailEl = document.getElementById('maStructureDetail');
+        if (!box || !titleEl || !detailEl) return;
+
+        const safe = structure || {
+            tone: 'neutral',
+            title: '⚪ 均線結構尚未計算',
+            detail: '完成 MA5／MA10／MA20／MA60 計算後，將顯示目前型態。'
+        };
+        box.className = `ma-structure-alert ${safe.tone || 'neutral'}`;
+        titleEl.textContent = safe.title;
+        detailEl.textContent = safe.detail;
     }
 
     /* 🔀 偵測最近是否發生黃金交叉(MA5上穿MA20)或死亡交叉(MA5下穿MA20)，掃描最近10個交易日 */
