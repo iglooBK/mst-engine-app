@@ -1318,6 +1318,56 @@
             font-weight: 600;
         }
 
+        /* 🏔️ 道氏價格結構 + 趨勢線 / 通道 */
+        .price-structure-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .price-structure-item {
+            background: #0d131f;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 10px 12px;
+            min-height: 82px;
+        }
+        .price-structure-item.bullish { border-color: rgba(255, 59, 48, 0.65); }
+        .price-structure-item.bearish { border-color: rgba(52, 199, 89, 0.65); }
+        .price-structure-item.caution { border-color: rgba(255, 184, 0, 0.65); }
+        .price-structure-label {
+            color: var(--text-label);
+            font-size: 0.64rem;
+            font-weight: 800;
+            letter-spacing: 0.55px;
+            margin-bottom: 5px;
+        }
+        .price-structure-state {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+        .price-structure-item.bullish .price-structure-state { color: var(--profit-color); }
+        .price-structure-item.bearish .price-structure-state { color: var(--loss-color); }
+        .price-structure-item.caution .price-structure-state { color: #ffb800; }
+        .price-structure-detail {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+        .price-structure-note {
+            color: #64748b;
+            font-size: 0.62rem;
+            line-height: 1.45;
+            margin: -4px 0 10px;
+        }
+
+        @media (max-width: 760px) {
+            .price-structure-grid { grid-template-columns: 1fr; }
+        }
+
         /* 🔔 到價提醒觸發樣式（買進=紅／賣出=綠，呼應現價高於/低於門檻的既有配色） */
         .cross-alert.alert-buy-hit {
             background: rgba(255, 59, 48, 0.12);
@@ -1334,7 +1384,7 @@
         .tech-chart-container {
             position: relative;
             width: 100%;
-            height: 240px;
+            height: 300px;
         }
 
         /* 💰 基本面 / 🏦 籌碼面 共用小卡片格線 */
@@ -3616,6 +3666,19 @@
         </div>
         <div class="card-body">
             <div id="crossAlertBox" class="cross-alert none">尚無資料</div>
+            <div class="price-structure-grid">
+                <section id="dowStructureBox" class="price-structure-item" aria-live="polite">
+                    <div class="price-structure-label">PRICE STRUCTURE // 道氏理論</div>
+                    <div id="dowStructureState" class="price-structure-state">⚪ 尚未分析</div>
+                    <div id="dowStructureDetail" class="price-structure-detail">等待確認波段高點與低點。</div>
+                </section>
+                <section id="trendChannelBox" class="price-structure-item" aria-live="polite">
+                    <div class="price-structure-label">TREND LINE &amp; CHANNEL // 趨勢線與通道</div>
+                    <div id="trendChannelState" class="price-structure-state">⚪ 尚未分析</div>
+                    <div id="trendChannelDetail" class="price-structure-detail">確認至少兩個有效轉折點後自動畫線。</div>
+                </section>
+            </div>
+            <div class="price-structure-note">轉折點採左右各 2 根 K 棒確認；最近 2 根 K 棒尚未完成確認，不會提前計入。此處描述價格結構，不代表買賣訊號。</div>
             <div class="tech-chart-container">
                 <canvas id="priceMaChart"></canvas>
             </div>
@@ -4913,6 +4976,7 @@
         });
         renderLatestPrice(null);
         renderMAStructure(null);
+        renderPriceStructureAnalysis(null);
 
         const cleanName = (portfolioName || '').trim();
         titleEl.textContent = cleanName || '未命名個股';
@@ -6139,7 +6203,16 @@
                     { label: 'MA5', data: [], borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.15 },
                     { label: 'MA10', data: [], borderColor: '#06b6d4', borderWidth: 1.5, pointRadius: 0, tension: 0.15 },
                     { label: 'MA20', data: [], borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0, tension: 0.15 },
-                    { label: 'MA60', data: [], borderColor: '#34c759', borderWidth: 1.5, pointRadius: 0, tension: 0.15 }
+                    { label: 'MA60', data: [], borderColor: '#34c759', borderWidth: 1.5, pointRadius: 0, tension: 0.15 },
+                    {
+                        label: '趨勢線', data: [], borderColor: '#ffb800', borderWidth: 2,
+                        pointRadius: context => (context.dataset._anchorIndices || []).includes(context.dataIndex) ? 4 : 0,
+                        pointHoverRadius: 5, borderDash: [7, 4], tension: 0, spanGaps: true
+                    },
+                    {
+                        label: '通道邊界', data: [], borderColor: 'rgba(255,184,0,.55)', borderWidth: 1.4,
+                        pointRadius: 0, borderDash: [3, 4], tension: 0, spanGaps: true
+                    }
                 ]
             },
             options: {
@@ -6403,6 +6476,217 @@
             }
         }
         return null;
+    }
+
+    /* 🏔️ 道氏理論價格結構 + 趨勢線 / 平行通道
+       Pivot 使用左右各 2 根 K 棒確認，因此最後 2 根 K 棒不會被提前認定為轉折。 */
+    function getPriceBarHigh(bar) {
+        const high = Number(bar?.high);
+        return Number.isFinite(high) ? high : Number(bar?.close);
+    }
+
+    function getPriceBarLow(bar) {
+        const low = Number(bar?.low);
+        return Number.isFinite(low) ? low : Number(bar?.close);
+    }
+
+    function detectConfirmedPriceSwings(closes, pivotWindow = 2) {
+        const highs = [];
+        const lows = [];
+        if (!Array.isArray(closes) || closes.length < pivotWindow * 2 + 2) return { highs, lows };
+
+        for (let i = pivotWindow; i < closes.length - pivotWindow; i++) {
+            const currentHigh = getPriceBarHigh(closes[i]);
+            const currentLow = getPriceBarLow(closes[i]);
+            if (!Number.isFinite(currentHigh) || !Number.isFinite(currentLow)) continue;
+
+            let isSwingHigh = true;
+            let isSwingLow = true;
+            for (let j = i - pivotWindow; j <= i + pivotWindow; j++) {
+                if (j === i) continue;
+                const neighborHigh = getPriceBarHigh(closes[j]);
+                const neighborLow = getPriceBarLow(closes[j]);
+                if (Number.isFinite(neighborHigh) && currentHigh <= neighborHigh) isSwingHigh = false;
+                if (Number.isFinite(neighborLow) && currentLow >= neighborLow) isSwingLow = false;
+            }
+
+            if (isSwingHigh) highs.push({ index: i, value: currentHigh, dateStr: closes[i].dateStr });
+            if (isSwingLow) lows.push({ index: i, value: currentLow, dateStr: closes[i].dateStr });
+        }
+        return { highs, lows };
+    }
+
+    function formatSwingDate(dateStr) {
+        const text = String(dateStr || '');
+        return text.length >= 10 ? text.slice(5) : text;
+    }
+
+    function buildTrendChannelCandidate(closes, anchors, type, tolerance) {
+        if (!Array.isArray(anchors) || anchors.length < 2) return null;
+        const first = anchors[anchors.length - 2];
+        const second = anchors[anchors.length - 1];
+        const distance = second.index - first.index;
+        if (distance <= 0) return null;
+
+        const slope = (second.value - first.value) / distance;
+        if ((type === 'up' && slope <= 0) || (type === 'down' && slope >= 0)) return null;
+
+        const lineData = Array(closes.length).fill(null);
+        const channelData = Array(closes.length).fill(null);
+        const lineAt = index => first.value + slope * (index - first.index);
+        for (let i = first.index; i < closes.length; i++) lineData[i] = lineAt(i);
+
+        let channelOffset = type === 'up' ? -Infinity : Infinity;
+        for (let i = first.index; i < closes.length; i++) {
+            const base = lineAt(i);
+            if (type === 'up') {
+                const high = getPriceBarHigh(closes[i]);
+                if (Number.isFinite(high)) channelOffset = Math.max(channelOffset, high - base);
+            } else {
+                const low = getPriceBarLow(closes[i]);
+                if (Number.isFinite(low)) channelOffset = Math.min(channelOffset, low - base);
+            }
+        }
+
+        if (Number.isFinite(channelOffset)) {
+            for (let i = first.index; i < closes.length; i++) channelData[i] = lineAt(i) + channelOffset;
+        }
+
+        let breakCount = 0;
+        for (let i = second.index + 1; i < closes.length; i++) {
+            const close = Number(closes[i]?.close);
+            if (!Number.isFinite(close)) continue;
+            if (type === 'up' && close < lineAt(i) - tolerance) breakCount++;
+            if (type === 'down' && close > lineAt(i) + tolerance) breakCount++;
+        }
+        const latestClose = Number(closes[closes.length - 1]?.close);
+        const latestLine = lineAt(closes.length - 1);
+        const latestHolds = type === 'up'
+            ? latestClose >= latestLine - tolerance
+            : latestClose <= latestLine + tolerance;
+
+        return {
+            type, first, second, slope, lineData, channelData,
+            anchorIndices: [first.index, second.index],
+            valid: breakCount === 0 && latestHolds,
+            breakCount, latestLine
+        };
+    }
+
+    function analyzePriceStructure(closes) {
+        const emptyLine = () => Array(Array.isArray(closes) ? closes.length : 0).fill(null);
+        if (!Array.isArray(closes) || closes.length < 10) {
+            return {
+                dow: { tone: 'neutral', state: '⚪ 價格結構資料不足', detail: '至少需要 10 根 K 棒才能開始確認波段高低點。' },
+                trend: { tone: 'neutral', state: '⚪ 趨勢線資料不足', detail: '尚未取得兩個確認後的同方向轉折點。', lineData: emptyLine(), channelData: emptyLine(), anchorIndices: [] }
+            };
+        }
+
+        const swings = detectConfirmedPriceSwings(closes, 2);
+        const recentHighs = swings.highs.slice(-2);
+        const recentLows = swings.lows.slice(-2);
+        const latestClose = Number(closes[closes.length - 1]?.close);
+        const recentBars = closes.slice(-20);
+        const ranges = recentBars
+            .map(bar => getPriceBarHigh(bar) - getPriceBarLow(bar))
+            .filter(value => Number.isFinite(value) && value >= 0);
+        const avgRange = ranges.length ? ranges.reduce((sum, value) => sum + value, 0) / ranges.length : 0;
+        const tolerance = Math.max(Math.abs(latestClose || 0) * 0.003, avgRange * 0.25);
+
+        let highCode = '--';
+        let lowCode = '--';
+        if (recentHighs.length === 2) {
+            const [previous, latest] = recentHighs;
+            if (latest.value > previous.value + tolerance) highCode = 'HH';
+            else if (latest.value < previous.value - tolerance) highCode = 'LH';
+            else highCode = 'EH';
+        }
+        if (recentLows.length === 2) {
+            const [previous, latest] = recentLows;
+            if (latest.value > previous.value + tolerance) lowCode = 'HL';
+            else if (latest.value < previous.value - tolerance) lowCode = 'LL';
+            else lowCode = 'EL';
+        }
+
+        const bullishStructure = highCode === 'HH' && lowCode === 'HL';
+        const bearishStructure = highCode === 'LH' && lowCode === 'LL';
+        const highText = recentHighs.length === 2
+            ? `${highCode}：${formatSwingDate(recentHighs[0].dateStr)} $${formatNumber(recentHighs[0].value, 2)} → ${formatSwingDate(recentHighs[1].dateStr)} $${formatNumber(recentHighs[1].value, 2)}`
+            : '波段高點尚不足 2 個';
+        const lowText = recentLows.length === 2
+            ? `${lowCode}：${formatSwingDate(recentLows[0].dateStr)} $${formatNumber(recentLows[0].value, 2)} → ${formatSwingDate(recentLows[1].dateStr)} $${formatNumber(recentLows[1].value, 2)}`
+            : '波段低點尚不足 2 個';
+
+        let dow;
+        if (bullishStructure) {
+            dow = { tone: 'bullish', state: '🔴 多頭價格結構｜HH + HL', detail: `高點抬高、低點墊高。${highText}｜${lowText}` };
+        } else if (bearishStructure) {
+            dow = { tone: 'bearish', state: '🟢 空頭價格結構｜LH + LL', detail: `反彈高點降低、波段低點下移。${highText}｜${lowText}` };
+        } else if (highCode === '--' || lowCode === '--') {
+            dow = { tone: 'neutral', state: '⚪ 波段結構尚未確認', detail: `${highText}｜${lowText}` };
+        } else {
+            dow = { tone: 'caution', state: `🟡 價格結構分歧｜${highCode} + ${lowCode}`, detail: `高低點尚未形成一致的多頭或空頭結構。${highText}｜${lowText}` };
+        }
+
+        const upCandidate = buildTrendChannelCandidate(closes, recentLows, 'up', tolerance);
+        const downCandidate = buildTrendChannelCandidate(closes, recentHighs, 'down', tolerance);
+        let selected = null;
+        if (bullishStructure) selected = upCandidate;
+        else if (bearishStructure) selected = downCandidate;
+        else if (upCandidate?.valid && !downCandidate?.valid) selected = upCandidate;
+        else if (downCandidate?.valid && !upCandidate?.valid) selected = downCandidate;
+
+        if (!selected) {
+            return {
+                dow,
+                trend: {
+                    tone: 'neutral', state: '⚪ 尚無單一有效趨勢通道',
+                    detail: '目前沒有兩個方向一致、且未被有效跌破／突破的轉折點可建立單一通道。',
+                    lineData: emptyLine(), channelData: emptyLine(), anchorIndices: []
+                }
+            };
+        }
+
+        const isUp = selected.type === 'up';
+        const directionText = isUp ? '上升' : '下降';
+        const anchorKind = isUp ? '低點' : '高點';
+        const holdText = isUp ? '現價仍位於支撐線上方' : '現價仍位於壓力線下方';
+        const breakText = isUp ? '趨勢線已遭有效跌破' : '趨勢線已遭有效突破';
+        const tone = selected.valid ? (isUp ? 'bullish' : 'bearish') : 'caution';
+        const trend = {
+            tone,
+            state: selected.valid ? `${isUp ? '🔴' : '🟢'} ${directionText}趨勢線與通道有效` : `🟡 ${directionText}趨勢線失效`,
+            detail: `連接 ${formatSwingDate(selected.first.dateStr)} $${formatNumber(selected.first.value, 2)} 與 ${formatSwingDate(selected.second.dateStr)} $${formatNumber(selected.second.value, 2)} 兩個確認${anchorKind}；${selected.valid ? `${holdText}，圖中同步顯示平行通道邊界。` : `${breakText}，不再視為有效支撐／壓力。`}`,
+            lineData: selected.lineData,
+            channelData: selected.valid ? selected.channelData : emptyLine(),
+            anchorIndices: selected.anchorIndices,
+            lineColor: selected.valid ? (isUp ? '#ff3b30' : '#34c759') : '#ffb800',
+            channelColor: selected.valid ? (isUp ? 'rgba(255,59,48,.52)' : 'rgba(52,199,89,.52)') : 'rgba(255,184,0,.45)',
+            lineLabel: `${directionText}趨勢線`,
+            channelLabel: `${directionText}通道${isUp ? '上緣' : '下緣'}`
+        };
+        return { dow, trend };
+    }
+
+    function renderPriceStructureAnalysis(analysis) {
+        const dowBox = document.getElementById('dowStructureBox');
+        const dowState = document.getElementById('dowStructureState');
+        const dowDetail = document.getElementById('dowStructureDetail');
+        const trendBox = document.getElementById('trendChannelBox');
+        const trendState = document.getElementById('trendChannelState');
+        const trendDetail = document.getElementById('trendChannelDetail');
+        if (!dowBox || !dowState || !dowDetail || !trendBox || !trendState || !trendDetail) return;
+
+        const safe = analysis || {
+            dow: { tone: 'neutral', state: '⚪ 尚未分析', detail: '等待確認波段高點與低點。' },
+            trend: { tone: 'neutral', state: '⚪ 尚未分析', detail: '確認至少兩個有效轉折點後自動畫線。' }
+        };
+        dowBox.className = `price-structure-item ${safe.dow?.tone || 'neutral'}`;
+        dowState.textContent = safe.dow?.state || '⚪ 尚未分析';
+        dowDetail.textContent = safe.dow?.detail || '';
+        trendBox.className = `price-structure-item ${safe.trend?.tone || 'neutral'}`;
+        trendState.textContent = safe.trend?.state || '⚪ 尚未分析';
+        trendDetail.textContent = safe.trend?.detail || '';
     }
 
     /* 台股漲跌停 UI 使用「制度價格」判斷：
@@ -7874,6 +8158,7 @@
         const ma10Data = computeMASeries(closes, 10);
         const ma20Data = computeMASeries(closes, 20);
         const ma60Data = computeMASeries(closes, 60);
+        const priceStructure = analyzePriceStructure(closes);
 
         priceMaChartInstance.data.labels = labels;
         priceMaChartInstance.data.datasets[0].data = closeData;
@@ -7881,10 +8166,20 @@
         priceMaChartInstance.data.datasets[2].data = ma10Data;
         priceMaChartInstance.data.datasets[3].data = ma20Data;
         priceMaChartInstance.data.datasets[4].data = ma60Data;
+        const trendDataset = priceMaChartInstance.data.datasets[5];
+        const channelDataset = priceMaChartInstance.data.datasets[6];
+        trendDataset.data = priceStructure.trend.lineData || Array(closes.length).fill(null);
+        trendDataset.label = priceStructure.trend.lineLabel || '趨勢線';
+        trendDataset.borderColor = priceStructure.trend.lineColor || '#ffb800';
+        trendDataset._anchorIndices = priceStructure.trend.anchorIndices || [];
+        channelDataset.data = priceStructure.trend.channelData || Array(closes.length).fill(null);
+        channelDataset.label = priceStructure.trend.channelLabel || '通道邊界';
+        channelDataset.borderColor = priceStructure.trend.channelColor || 'rgba(255,184,0,.45)';
         priceMaChartInstance.update();
 
         const crossInfo = detectCross(closes);
         renderCrossAlert(crossInfo);
+        renderPriceStructureAnalysis(priceStructure);
     }
 
 
