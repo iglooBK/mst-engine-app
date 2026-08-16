@@ -8,6 +8,7 @@
     <meta name="norns-release" content="PLOUTOS-NORNS-OFFICIAL-v1.2-PLAIN-DRIVERS-20260814">
     <meta name="norns-driver-copy-build" content="PLAIN-LANGUAGE-v2-20260814">
     <meta name="constantine-sound-build" content="DECISION-LOCK-v5-20260816">
+    <meta name="trend-snapshot-build" content="TREND-SNAPSHOT-v1.3-READABLE-TEXT-20260816">
     <meta name="application-name" content="MST ENGINE PLOUTOS">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
@@ -3656,6 +3657,124 @@
             }
         }
 
+    
+        /* 🧭 TREND SNAPSHOT v1 */
+        .trend-snapshot-card {
+            border-color: rgba(6,182,212,.34);
+            background: linear-gradient(180deg, rgba(6,182,212,.035), rgba(9,12,16,.98) 28%);
+        }
+        .trend-overall {
+            display:flex; align-items:center; justify-content:space-between; gap:14px;
+            padding:13px 14px; margin-bottom:12px; border:1px solid #26344b;
+            border-radius:6px; background:#0d131f;
+        }
+        .trend-overall-label { color:var(--text-muted); font-size:.66rem; font-weight:800; letter-spacing:1px; }
+        .trend-overall-state { margin-top:4px; font-size:1.08rem; font-weight:900; letter-spacing:.7px; }
+        .trend-overall-state.bullish { color:var(--profit-color); }
+        .trend-overall-state.bearish { color:var(--loss-color); }
+        .trend-overall-state.neutral { color:#ffb800; }
+        .trend-score-badge {
+            min-width:76px; text-align:center; padding:7px 9px; border-radius:5px;
+            border:1px solid rgba(148,163,184,.25); background:#090c10;
+            color:#cbd5e1; font-size:.66rem; font-weight:800; line-height:1.35;
+        }
+        .trend-metrics-grid {
+            display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-bottom:12px;
+        }
+        .trend-metric {
+            min-width:0; padding:10px 11px; border:1px solid #1e293b; border-radius:5px; background:#0d131f;
+        }
+        .trend-metric-label { color:#7f93ad; font-size:.62rem; font-weight:900; letter-spacing:.65px; }
+        .trend-metric-main { margin-top:5px; color:#e5edf8; font-size:.82rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .trend-metric-main.up { color:var(--profit-color); }
+        .trend-metric-main.down { color:var(--loss-color); }
+        .trend-metric-main.warn { color:#ffb800; }
+        .trend-metric-sub { margin-top:4px; color:var(--text-muted); font-size:.64rem; line-height:1.45; }
+        .trend-meter { display:flex; gap:3px; margin-top:7px; }
+        .trend-meter i { display:block; height:4px; flex:1; border-radius:2px; background:#263247; }
+        .trend-meter i.on { background:#5f7898; box-shadow:0 0 6px rgba(95,120,152,.18); }
+        .trend-structure-row {
+            display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-bottom:12px;
+        }
+        .trend-structure-box { padding:9px 11px; border:1px solid #1e293b; border-radius:5px; background:#0b111b; }
+        .trend-structure-box .k { color:#71839d; font-size:.61rem; font-weight:900; letter-spacing:.6px; }
+        .trend-structure-box .v { margin-top:4px; color:#dce7f5; font-size:.76rem; font-weight:900; }
+        .trend-52w { padding:11px 12px; border-top:1px solid #1d293a; }
+        .trend-52w-head { display:flex; justify-content:space-between; gap:12px; color:#8ea0b9; font-size:.67rem; font-weight:800; }
+        .trend-returns-mini { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:10px; }
+        .trend-return-cell { padding:7px 5px; text-align:center; background:#0b111b; border:1px solid #1d293a; border-radius:4px; }
+        .trend-return-cell .k { color:#71839d; font-size:.58rem; font-weight:800; }
+        .trend-return-cell .v { margin-top:3px; font-size:.72rem; font-weight:900; }
+        .trend-note { margin-top:9px; color:#5f718a; font-size:.62rem; line-height:1.5; }
+        @media (max-width:760px) {
+            .trend-metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .trend-returns-mini { grid-template-columns:repeat(2,1fr); }
+        }
+        @media (max-width:470px) {
+            .trend-metrics-grid, .trend-structure-row { grid-template-columns:1fr; }
+        }
+
+    
+        /* TREND SNAPSHOT v1.2 — plain-language interpretation */
+        .trend-plain {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed rgba(127,147,173,.18);
+            color: #a9bad0;
+            font-size: .63rem;
+            line-height: 1.45;
+        }
+        .trend-summary {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255,184,0,.30);
+            border-left: 3px solid #ffb800;
+            border-radius: 5px;
+            background: linear-gradient(90deg, rgba(255,184,0,.055), rgba(13,19,31,.96) 35%);
+        }
+        .trend-summary-title {
+            color: #ffb800;
+            font-size: .66rem;
+            font-weight: 900;
+            letter-spacing: .75px;
+            margin-bottom: 7px;
+        }
+        .trend-summary-text {
+            color: #cbd7e6;
+            font-size: .72rem;
+            line-height: 1.75;
+        }
+
+    
+        /* TREND SNAPSHOT v1.3 — readability pass */
+        .trend-snapshot-card .news-header-title h3 { font-size: .90rem !important; }
+        .trend-snapshot-card .news-header-title .btn { font-size: .78rem !important; }
+
+        .trend-overall-label { font-size: .76rem !important; }
+        .trend-overall-state { font-size: 1.22rem !important; }
+        .trend-score-badge { font-size: .75rem !important; }
+
+        .trend-metric-label { font-size: .72rem !important; }
+        .trend-metric-main { font-size: .94rem !important; }
+        .trend-metric-sub { font-size: .74rem !important; line-height: 1.5 !important; }
+        .trend-plain { font-size: .74rem !important; line-height: 1.55 !important; }
+
+        .trend-structure-box .k { font-size: .71rem !important; }
+        .trend-structure-box .v { font-size: .88rem !important; }
+
+        .trend-52w-head { font-size: .76rem !important; }
+        .trend-return-cell .k { font-size: .68rem !important; }
+        .trend-return-cell .v { font-size: .84rem !important; }
+
+        .trend-summary-title { font-size: .76rem !important; }
+        .trend-summary-text { font-size: .84rem !important; line-height: 1.8 !important; }
+        .trend-note { font-size: .70rem !important; line-height: 1.55 !important; }
+
+        @media (max-width: 760px) {
+            .trend-metric-main { font-size: .90rem !important; }
+            .trend-summary-text { font-size: .80rem !important; }
+        }
+
     </style>
 </head>
 <body>
@@ -4176,14 +4295,14 @@
     </div>
 
 
-    <!-- 📊 延伸分析：52週高低 / 報酬率 / 大盤比較 -->
-    <div class="news-card">
+    <!-- 🧭 TREND SNAPSHOT：方向 / 強度 / 動能 / 量能 / 相對強弱 / 波動 / 52W -->
+    <div class="news-card trend-snapshot-card">
         <div class="news-header-title">
-            <h3>📊 EXTENDED ANALYSIS // <span id="extStockTitle">聯發科 (2454)</span> 52週高低與報酬率</h3>
-            <button class="btn btn-cyan" style="font-size: 0.7rem; padding: 2px 6px;" onclick="loadExtendedAnalysis()">📊 載入延伸分析</button>
+            <h3>🧭 TREND SNAPSHOT // <span id="extStockTitle">聯發科 (2454)</span> 趨勢總覽</h3>
+            <button class="btn btn-cyan" style="font-size: 0.7rem; padding: 2px 6px;" onclick="loadExtendedAnalysis()">🧭 載入趨勢總覽</button>
         </div>
         <div id="extContent">
-            <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">此區塊需額外抓取約一年份資料，點擊上方按鈕載入（載入需要幾秒鐘）</div>
+            <div class="ext-placeholder" style="color: var(--text-muted); font-size: 0.8rem;">整合約一年日K、量價、相對大盤與波動資料；點擊上方按鈕載入。</div>
         </div>
     </div>
 
@@ -9115,6 +9234,72 @@
         return ((toClose - fromClose) / fromClose) * 100;
     }
 
+    function trendSnapshotRSI(rows, period = 14) {
+        if (!Array.isArray(rows) || rows.length <= period) return null;
+        let gains = 0, losses = 0;
+        for (let i = rows.length - period; i < rows.length; i++) {
+            const diff = rows[i].close - rows[i - 1].close;
+            if (diff > 0) gains += diff; else losses -= diff;
+        }
+        if (losses === 0) return 100;
+        const rs = (gains / period) / (losses / period);
+        return 100 - (100 / (1 + rs));
+    }
+
+    function trendSnapshotATR(rows, period = 14) {
+        if (!Array.isArray(rows) || rows.length <= period) return null;
+        const trs = [];
+        for (let i = 1; i < rows.length; i++) {
+            const h = Number(rows[i].high), l = Number(rows[i].low), pc = Number(rows[i-1].close);
+            if (![h,l,pc].every(Number.isFinite)) continue;
+            trs.push(Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)));
+        }
+        if (trs.length < period) return null;
+        return trs.slice(-period).reduce((a,b)=>a+b,0) / period;
+    }
+
+    function trendSnapshotADX(rows, period = 14) {
+        if (!Array.isArray(rows) || rows.length < period * 2 + 1) return null;
+        const tr=[], plusDM=[], minusDM=[];
+        for (let i=1;i<rows.length;i++) {
+            const cur=rows[i], prev=rows[i-1];
+            const up=Number(cur.high)-Number(prev.high);
+            const down=Number(prev.low)-Number(cur.low);
+            const trv=Math.max(Number(cur.high)-Number(cur.low), Math.abs(Number(cur.high)-Number(prev.close)), Math.abs(Number(cur.low)-Number(prev.close)));
+            if (![up,down,trv].every(Number.isFinite)) continue;
+            tr.push(trv); plusDM.push(up>down && up>0 ? up : 0); minusDM.push(down>up && down>0 ? down : 0);
+        }
+        if (tr.length < period*2) return null;
+        const dx=[];
+        for (let i=period-1;i<tr.length;i++) {
+            const trN=tr.slice(i-period+1,i+1).reduce((a,b)=>a+b,0);
+            const pN=plusDM.slice(i-period+1,i+1).reduce((a,b)=>a+b,0);
+            const mN=minusDM.slice(i-period+1,i+1).reduce((a,b)=>a+b,0);
+            if (!trN) continue;
+            const pdi=100*pN/trN, mdi=100*mN/trN;
+            const denom=pdi+mdi;
+            if (denom) dx.push({dx:100*Math.abs(pdi-mdi)/denom, pdi, mdi});
+        }
+        if (dx.length < period) return null;
+        const tail=dx.slice(-period);
+        const last=dx[dx.length-1];
+        return { adx:tail.reduce((s,x)=>s+x.dx,0)/tail.length, plusDI:last.pdi, minusDI:last.mdi };
+    }
+
+    function trendSnapshotOBV(rows) {
+        if (!Array.isArray(rows) || rows.length < 21) return null;
+        let obv=0; const series=[0];
+        for (let i=1;i<rows.length;i++) {
+            const vol=Number(rows[i].volume);
+            if (!Number.isFinite(vol)) { series.push(obv); continue; }
+            if (rows[i].close > rows[i-1].close) obv += vol;
+            else if (rows[i].close < rows[i-1].close) obv -= vol;
+            series.push(obv);
+        }
+        const now=series[series.length-1], prev=series[Math.max(0,series.length-21)];
+        return {delta:now-prev, state:now>prev?'ACCUMULATION':now<prev?'DISTRIBUTION':'NEUTRAL'};
+    }
+
     async function loadExtendedAnalysis() {
         const contentEl = document.getElementById('extContent');
         const titleEl = document.getElementById('extStockTitle');
@@ -9123,99 +9308,232 @@
 
         const stockNo = extractStockCode(portfolioName);
         if (!stockNo) {
-            contentEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 未偵測到股票代碼，請在名稱中包含代碼 (例如：聯發科 2454)</div>`;
+            contentEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">⚠️ 未偵測到股票代碼，請在名稱中包含代碼。</div>`;
             return;
         }
 
-        contentEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [${getStockMarketDisplay(stockNo)}] 正在抓取「${stockNo}」約一年份歷史資料與大盤指數，請稍候（約需 10~20 秒）...</div>`;
+        contentEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px; text-align: center; font-size: 0.8rem;">📡 [${getStockMarketDisplay(stockNo)}] 正在建立「${stockNo}」TREND SNAPSHOT，整合約一年日K與大盤資料...</div>`;
 
         try {
             const [stockCloses, indexCloses] = await Promise.all([
                 fetchRecentCloses(stockNo, 245, 14),
                 fetchIndexCloses(245, 14)
             ]);
-
-            if (!stockCloses || stockCloses.length === 0) {
-                contentEl.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 無法取得「${stockNo}」歷史行情（Yahoo .TWO / TPEx 來源皆失敗），請稍後再按「重新計算」。</div>`;
-                return;
-            }
+            if (!stockCloses?.length) throw new Error('NO_STOCK_HISTORY');
 
             const latest = stockCloses[stockCloses.length - 1];
+            const oneYearAgo = new Date(latest.date); oneYearAgo.setDate(oneYearAgo.getDate()-365);
+            const yearWindow = stockCloses.filter(x=>x.date>=oneYearAgo);
+            const high52w=Math.max(...yearWindow.map(x=>x.high ?? x.close));
+            const low52w=Math.min(...yearWindow.map(x=>x.low ?? x.close));
+            const rangePct=high52w>low52w?((latest.close-low52w)/(high52w-low52w))*100:50;
+            const distHigh=((latest.close-high52w)/high52w)*100;
 
-            // 52週高低
-            const oneYearAgo = new Date(latest.date);
-            oneYearAgo.setDate(oneYearAgo.getDate() - 365);
-            const yearWindow = stockCloses.filter(item => item.date >= oneYearAgo);
-            const high52w = Math.max(...yearWindow.map(item => item.close));
-            const low52w = Math.min(...yearWindow.map(item => item.close));
-            const rangePct = high52w > low52w ? ((latest.close - low52w) / (high52w - low52w)) * 100 : 50;
+            const r5=calcReturnPct(findCloseNDaysAgo(stockCloses,5)?.close,latest.close);
+            const r20=calcReturnPct(findCloseNDaysAgo(stockCloses,20)?.close,latest.close);
+            const r60=calcReturnPct(findCloseNDaysAgo(stockCloses,60)?.close,latest.close);
+            const yearStart=new Date(latest.date.getFullYear(),0,1);
+            const rYtd=calcReturnPct(findCloseAtOrAfterDate(stockCloses,yearStart)?.close,latest.close);
 
-            // 近期報酬率 (股票)
-            const ret5d = calcReturnPct(findCloseNDaysAgo(stockCloses, 5) ? findCloseNDaysAgo(stockCloses, 5).close : null, latest.close);
-            const ret1m = calcReturnPct(findCloseNDaysAgo(stockCloses, 20) ? findCloseNDaysAgo(stockCloses, 20).close : null, latest.close);
-            const ret3m = calcReturnPct(findCloseNDaysAgo(stockCloses, 60) ? findCloseNDaysAgo(stockCloses, 60).close : null, latest.close);
-            const yearStart = new Date(latest.date.getFullYear(), 0, 1);
-            const ytdStartItem = findCloseAtOrAfterDate(stockCloses, yearStart);
-            const retYtd = calcReturnPct(ytdStartItem ? ytdStartItem.close : null, latest.close);
-
-            // 大盤同期報酬率 (用日期比對，非交易日數量，避免略微誤差)
-            let idxRet5d = null, idxRet1m = null, idxRet3m = null, idxRetYtd = null;
-            if (indexCloses && indexCloses.length > 0) {
-                const latestIdx = indexCloses[indexCloses.length - 1];
-                idxRet5d = calcReturnPct(findCloseNDaysAgo(indexCloses, 5) ? findCloseNDaysAgo(indexCloses, 5).close : null, latestIdx.close);
-                idxRet1m = calcReturnPct(findCloseNDaysAgo(indexCloses, 20) ? findCloseNDaysAgo(indexCloses, 20).close : null, latestIdx.close);
-                idxRet3m = calcReturnPct(findCloseNDaysAgo(indexCloses, 60) ? findCloseNDaysAgo(indexCloses, 60).close : null, latestIdx.close);
-                const idxYtdStartItem = findCloseAtOrAfterDate(indexCloses, yearStart);
-                idxRetYtd = calcReturnPct(idxYtdStartItem ? idxYtdStartItem.close : null, latestIdx.close);
+            let idx20=null;
+            if (indexCloses?.length) {
+                const li=indexCloses[indexCloses.length-1];
+                idx20=calcReturnPct(findCloseNDaysAgo(indexCloses,20)?.close,li.close);
             }
+            const rel20=(r20!==null && idx20!==null)?r20-idx20:null;
 
-            const fmtRet = (v) => v === null ? '--' : `${v > 0 ? '+' : ''}${formatNumber(v, 2)}%`;
-            const retClass = (v) => v === null ? '' : (v > 0 ? 'color: var(--profit-color);' : (v < 0 ? 'color: var(--loss-color);' : ''));
+            const adx=trendSnapshotADX(stockCloses,14);
+            const rsi=trendSnapshotRSI(stockCloses,14);
+            const atr=trendSnapshotATR(stockCloses,14);
+            const atrPct=(atr && latest.close)?atr/latest.close*100:null;
+            const obv=trendSnapshotOBV(stockCloses);
 
-            contentEl.innerHTML = `
-                <div class="range-bar-wrapper">
-                    <div style="font-size: 0.75rem; color: var(--text-label); font-weight: 700;">52週價格區間 // 現價位置 ${formatNumber(rangePct, 0)}%</div>
-                    <div class="range-bar-track">
-                        <div class="range-bar-dot" style="left: ${Math.min(100, Math.max(0, rangePct))}%;"></div>
+            const vols=stockCloses.slice(-21,-1).map(x=>Number(x.volume)).filter(Number.isFinite);
+            const avgVol20=vols.length?vols.reduce((a,b)=>a+b,0)/vols.length:null;
+            const latestVol=Number(latest.volume);
+            const rvol=(avgVol20 && Number.isFinite(latestVol))?latestVol/avgVol20:null;
+
+            const c20=findCloseNDaysAgo(stockCloses,20)?.close;
+            const c60=findCloseNDaysAgo(stockCloses,60)?.close;
+            const directionScore=(c20 && latest.close>c20?1:-1)+(c60 && latest.close>c60?1:-1)+(rangePct>=60?1:rangePct<=40?-1:0);
+            const bullish=directionScore>0;
+            const bearish=directionScore<0;
+
+            let strengthText='MODERATE', strengthLevel=3;
+            if (adx?.adx>=40){strengthText='VERY STRONG';strengthLevel=5;}
+            else if (adx?.adx>=25){strengthText='STRONG';strengthLevel=4;}
+            else if (adx?.adx<20){strengthText='WEAK / RANGE';strengthLevel=2;}
+
+            const dirText=bullish?'BULLISH':bearish?'BEARISH':'NEUTRAL';
+            const dirClass=bullish?'up':bearish?'down':'warn';
+            const overall=(bullish && adx?.adx>=25)?'STRONG BULLISH':(bearish && adx?.adx>=25)?'STRONG BEARISH':bullish?'BULLISH BIAS':bearish?'BEARISH BIAS':'MIXED / RANGE';
+            const overallClass=bullish?'bullish':bearish?'bearish':'neutral';
+
+            const momentumText=rsi===null?'DATA N/A':rsi>=70?'OVERHEATED':rsi<=30?'OVERSOLD':rsi>=55?'POSITIVE':rsi<=45?'NEGATIVE':'NEUTRAL';
+            const momentumClass=rsi>=70||rsi<=30?'warn':rsi>=55?'up':rsi<=45?'down':'';
+            const volumeText=rvol===null?'DATA N/A':rvol>=1.5?'EXPANDING':rvol>=1?'NORMAL+':'LIGHT';
+            const relText=rel20===null?'DATA N/A':rel20>=3?'OUTPERFORM':rel20<=-3?'UNDERPERFORM':'IN LINE';
+            const relClass=rel20===null?'':rel20>=3?'up':rel20<=-3?'down':'';
+            const volText=atrPct===null?'DATA N/A':atrPct>=4?'HIGH':atrPct>=2?'MODERATE':'LOW';
+            const moneyText=obv?.state || 'DATA N/A';
+            const moneyClass=moneyText==='ACCUMULATION'?'up':moneyText==='DISTRIBUTION'?'down':'';
+
+            // TREND SNAPSHOT v1.2：每格白話判讀
+            const directionPlain = bullish ? '中短期價格方向一致偏上。' : bearish ? '中短期價格方向一致偏下。' : '中短期方向分歧，暫無明確趨勢。';
+            const strengthPlain = adx?.adx >= 25
+                ? ((adx?.plusDI ?? 0) > (adx?.minusDI ?? 0) ? '多方力量較強，趨勢具有延續力。' : '空方力量較強，下降趨勢具有力道。')
+                : '目前趨勢力道有限，較容易震盪。';
+            const momentumPlain = rsi === null ? '動能資料不足。'
+                : rsi >= 70 ? '短線動能很強，但已進入偏熱區。'
+                : rsi <= 30 ? '短線動能偏弱，但已進入超賣區。'
+                : rsi >= 55 ? '近期買方動能仍然正向。'
+                : rsi <= 45 ? '近期賣方動能相對偏強。'
+                : '目前多空動能大致平衡。';
+            const volumePlain = rvol === null ? '目前無足夠成交量資料。'
+                : rvol >= 1.5 ? '成交量明顯高於20日平均，市場參與升溫。'
+                : rvol >= 1 ? '成交量略高於20日平均，量能正常。'
+                : rvol >= .7 ? '成交量低於20日平均，量能偏淡。'
+                : '成交量明顯萎縮，市場參與度偏低。';
+            const relativePlain = rel20 === null ? '目前無足夠大盤比較資料。'
+                : rel20 >= 3 ? '近20日表現明顯跑贏大盤。'
+                : rel20 <= -3 ? '近20日表現明顯落後大盤。'
+                : '近20日表現與大盤大致同步。';
+            const volatilityPlain = atrPct === null ? '目前無足夠波動資料。'
+                : atrPct >= 4 ? '近期價格震盪大，進出風險較高。'
+                : atrPct >= 2 ? '近期波動中等，仍需留意震盪。'
+                : '近期價格波動相對平穩。';
+            const pricePlain = rangePct >= 75 ? '股價已位於52週相對高檔區。'
+                : rangePct <= 25 ? '股價目前位於52週相對低檔區。'
+                : '股價目前位於52週區間中段。';
+            const moneyPlain = moneyText === 'ACCUMULATION' ? '近20日量價結構偏向資金累積。'
+                : moneyText === 'DISTRIBUTION' ? '近20日量價結構偏向資金流出。'
+                : '近20日資金流向暫無明顯方向。';
+
+            const fmt=(v,d=1)=>v===null||v===undefined||!Number.isFinite(v)?'--':formatNumber(v,d);
+            const pct=(v,d=1)=>v===null||!Number.isFinite(v)?'--':`${v>0?'+':''}${formatNumber(v,d)}%`;
+            const meter=(level)=>`<div class="trend-meter">${[1,2,3,4,5].map(i=>`<i class="${i<=level?'on':''}"></i>`).join('')}</div>`;
+
+            const stockDisplayName = (portfolioName || stockNo).replace(/\s*\([^)]*\)\s*$/, '').trim();
+            const trendPhrase = bullish
+                ? (adx?.adx >= 25 ? '目前處於明顯的多頭趨勢，多方力量較強' : '目前價格方向偏多，但趨勢力道仍屬有限')
+                : bearish
+                    ? (adx?.adx >= 25 ? '目前處於明顯的空頭趨勢，空方力量較強' : '目前價格方向偏空，但趨勢力道仍屬有限')
+                    : '目前多空方向分歧，尚未形成明確趨勢';
+            const momentumPhrase = rsi === null ? '短線動能資料不足'
+                : rsi >= 70 ? '短線動能強勁但已有過熱現象'
+                : rsi <= 30 ? '短線動能偏弱且已進入超賣區'
+                : rsi >= 55 ? '近期動能仍然正向'
+                : rsi <= 45 ? '近期動能偏弱'
+                : '近期動能大致中性';
+            const volumePhrase = rvol === null ? '成交量資料不足'
+                : rvol >= 1.5 ? '成交量正在明顯放大'
+                : rvol >= 1 ? '成交量維持正常水準'
+                : '成交量目前偏淡';
+            const relativePhrase = rel20 === null ? '暫時無法判斷相對大盤強弱'
+                : rel20 >= 3 ? '個股表現也明顯強於大盤'
+                : rel20 <= -3 ? '個股表現明顯弱於大盤'
+                : '個股表現與大盤大致同步';
+            const moneyPhrase = moneyText === 'ACCUMULATION' ? 'OBV 顯示量價資金偏向累積'
+                : moneyText === 'DISTRIBUTION' ? 'OBV 顯示量價資金偏向流出'
+                : 'OBV 暫未顯示明確資金方向';
+            const positionPhrase = rangePct >= 75 ? '目前股價已位於 52 週相對高檔'
+                : rangePct <= 25 ? '目前股價位於 52 週相對低檔'
+                : '目前股價位於 52 週區間中段';
+            const riskParts = [];
+            if (atrPct !== null && atrPct >= 4) riskParts.push('近期波動非常大');
+            else if (atrPct !== null && atrPct >= 2) riskParts.push('近期波動屬中等');
+            if (rYtd !== null && rYtd >= 50) riskParts.push('今年以來已累積相當大的漲幅');
+            else if (rYtd !== null && rYtd <= -30) riskParts.push('今年以來跌幅仍然較深');
+            const riskPhrase = riskParts.length ? riskParts.join('，加上') : '目前未出現特別極端的年度漲跌與波動組合';
+
+            let finalState = '趨勢與風險訊號混合，宜搭配其他技術結構觀察';
+            if (bullish && moneyText === 'ACCUMULATION' && atrPct !== null && atrPct >= 4 && rangePct >= 75)
+                finalState = '趨勢強、資金強，但波動與追高風險也高';
+            else if (bullish && moneyText === 'ACCUMULATION')
+                finalState = '趨勢偏多、資金偏強，但仍需留意波動與位置風險';
+            else if (bearish && moneyText === 'DISTRIBUTION')
+                finalState = '趨勢偏空、資金偏弱，風險仍然較高';
+            else if (bearish)
+                finalState = '價格趨勢偏弱，宜優先留意下行風險';
+
+            const summaryText = `${stockDisplayName}${trendPhrase}，${momentumPhrase}，而且${volumePhrase}，${relativePhrase}；${moneyPhrase}。不過${positionPhrase}，${riskPhrase}，因此目前屬於「${finalState}」的狀態。`;
+
+            contentEl.innerHTML=`
+                <div class="trend-overall">
+                    <div>
+                        <div class="trend-overall-label">OVERALL TREND // 綜合趨勢狀態</div>
+                        <div class="trend-overall-state ${overallClass}">● ${overall}</div>
                     </div>
-                    <div class="range-bar-labels">
-                        <span>低點 $${formatNumber(low52w, 2)}</span>
-                        <span>現價 $${formatNumber(latest.close, 2)}</span>
-                        <span>高點 $${formatNumber(high52w, 2)}</span>
+                    <div class="trend-score-badge">STATE<br>${dirText}</div>
+                </div>
+
+                <div class="trend-metrics-grid">
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">DIRECTION // 方向</div>
+                        <div class="trend-metric-main ${dirClass}">${bullish?'▲':bearish?'▼':'◆'} ${dirText}</div>
+                        <div class="trend-metric-sub">20D ${pct(r20)} ｜ 3M ${pct(r60)}</div><div class="trend-plain">${directionPlain}</div>${meter(Math.min(5,Math.max(1,3+directionScore)))}
+                    </div>
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">STRENGTH // 趨勢強度</div>
+                        <div class="trend-metric-main">${strengthText}</div>
+                        <div class="trend-metric-sub">ADX ${fmt(adx?.adx,1)} ｜ +DI ${fmt(adx?.plusDI,1)} / −DI ${fmt(adx?.minusDI,1)}</div><div class="trend-plain">${strengthPlain}</div>${meter(strengthLevel)}
+                    </div>
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">MOMENTUM // 動能</div>
+                        <div class="trend-metric-main ${momentumClass}">${momentumText}</div>
+                        <div class="trend-metric-sub">RSI(14) ${fmt(rsi,1)}</div><div class="trend-plain">${momentumPlain}</div>${meter(rsi===null?1:rsi>=70?5:rsi>=55?4:rsi>=45?3:rsi>=30?2:1)}
+                    </div>
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">VOLUME // 量能確認</div>
+                        <div class="trend-metric-main ${rvol>=1.5?'up':rvol<.7?'warn':''}">${volumeText}</div>
+                        <div class="trend-metric-sub">Relative Volume ${rvol===null?'--':fmt(rvol,2)+'×'} vs 20D</div><div class="trend-plain">${volumePlain}</div>${meter(rvol===null?1:rvol>=2?5:rvol>=1.5?4:rvol>=1?3:rvol>=.7?2:1)}
+                    </div>
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">REL. STRENGTH // 相對大盤</div>
+                        <div class="trend-metric-main ${relClass}">${relText}</div>
+                        <div class="trend-metric-sub">20D ${pct(r20)} vs TAIEX ${pct(idx20)} ｜ Alpha ${pct(rel20)}</div><div class="trend-plain">${relativePlain}</div>${meter(rel20===null?1:rel20>=8?5:rel20>=3?4:rel20>-3?3:rel20>-8?2:1)}
+                    </div>
+                    <div class="trend-metric">
+                        <div class="trend-metric-label">VOLATILITY // 波動</div>
+                        <div class="trend-metric-main ${atrPct>=4?'warn':''}">${volText}</div>
+                        <div class="trend-metric-sub">ATR(14) ${fmt(atr,2)} ｜ ATR% ${atrPct===null?'--':fmt(atrPct,2)+'%'}</div><div class="trend-plain">${volatilityPlain}</div>${meter(atrPct===null?1:atrPct>=5?5:atrPct>=4?4:atrPct>=2?3:atrPct>=1?2:1)}
                     </div>
                 </div>
-                <table class="returns-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">期間報酬率</th>
-                            <th>近5日</th>
-                            <th>近1月</th>
-                            <th>近3月</th>
-                            <th>今年以來</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="text-align:left; color: var(--text-label); font-weight:700;">${stockNo}</td>
-                            <td style="${retClass(ret5d)}">${fmtRet(ret5d)}</td>
-                            <td style="${retClass(ret1m)}">${fmtRet(ret1m)}</td>
-                            <td style="${retClass(ret3m)}">${fmtRet(ret3m)}</td>
-                            <td style="${retClass(retYtd)}">${fmtRet(retYtd)}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align:left; color: var(--text-label); font-weight:700;">大盤(加權指數)</td>
-                            <td style="${retClass(idxRet5d)}">${fmtRet(idxRet5d)}</td>
-                            <td style="${retClass(idxRet1m)}">${fmtRet(idxRet1m)}</td>
-                            <td style="${retClass(idxRet3m)}">${fmtRet(idxRet3m)}</td>
-                            <td style="${retClass(idxRetYtd)}">${fmtRet(idxRetYtd)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 8px;">資料日期：${latest.dateStr}｜共取得 ${stockCloses.length} 個交易日｜紅=正報酬、綠=負報酬</div>
-            `;
-        } catch (error) {
-            console.error('Extended analysis error:', error);
-            contentEl.innerHTML = `<div style="color: #ef4444; padding: 12px; text-align: center; font-size: 0.8rem;">❌ 延伸分析資料擷取失敗，可能是網路問題或 TWSE 暫時無法連線，請稍後重試。</div>`;
+
+                <div class="trend-structure-row">
+                    <div class="trend-structure-box">
+                        <div class="k">PRICE POSITION // 價格結構位置</div>
+                        <div class="v">${rangePct>=75?'▲ 52W 高檔區':rangePct<=25?'▼ 52W 低檔區':'◆ 52W 中段'} ｜ ${fmt(rangePct,0)}%</div><div class="trend-plain">${pricePlain}</div>
+                    </div>
+                    <div class="trend-structure-box">
+                        <div class="k">MONEY FLOW // OBV 20D</div>
+                        <div class="v ${moneyClass}">${moneyText==='ACCUMULATION'?'▲ ':moneyText==='DISTRIBUTION'?'▼ ':'◆ '}${moneyText}</div><div class="trend-plain">${moneyPlain}</div>
+                    </div>
+                </div>
+
+                <div class="trend-52w">
+                    <div class="trend-52w-head">
+                        <span>52W POSITION // LOW $${fmt(low52w,2)}</span>
+                        <span>距 HIGH ${pct(distHigh,1)} ｜ HIGH $${fmt(high52w,2)}</span>
+                    </div>
+                    <div class="range-bar-track" style="margin-top:9px;">
+                        <div class="range-bar-dot" style="left:${Math.min(100,Math.max(0,rangePct))}%;"></div>
+                    </div>
+                    <div class="trend-returns-mini">
+                        <div class="trend-return-cell"><div class="k">5D</div><div class="v" style="${r5>0?'color:var(--profit-color)':r5<0?'color:var(--loss-color)':''}">${pct(r5)}</div></div>
+                        <div class="trend-return-cell"><div class="k">20D</div><div class="v" style="${r20>0?'color:var(--profit-color)':r20<0?'color:var(--loss-color)':''}">${pct(r20)}</div></div>
+                        <div class="trend-return-cell"><div class="k">3M</div><div class="v" style="${r60>0?'color:var(--profit-color)':r60<0?'color:var(--loss-color)':''}">${pct(r60)}</div></div>
+                        <div class="trend-return-cell"><div class="k">YTD</div><div class="v" style="${rYtd>0?'color:var(--profit-color)':rYtd<0?'color:var(--loss-color)':''}">${pct(rYtd)}</div></div>
+                    </div>
+                    <div class="trend-summary">
+                        <div class="trend-summary-title">🧭 SNAPSHOT SUMMARY // 白話總結</div>
+                        <div class="trend-summary-text">${summaryText}</div>
+                    </div>
+                    <div class="trend-note">資料日期：${latest.dateStr}｜${stockCloses.length} 個交易日。TREND SNAPSHOT 是當下狀態摘要，不代表未來漲跌；詳細原因仍以 TECHNICAL CHART 各指標為準。</div>
+                </div>`;
+        } catch(error) {
+            console.error('Trend Snapshot error:',error);
+            contentEl.innerHTML=`<div style="color:#ef4444;padding:12px;text-align:center;font-size:.8rem;">❌ TREND SNAPSHOT 資料建立失敗，請稍後重試。</div>`;
         }
     }
 
