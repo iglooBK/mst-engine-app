@@ -13,12 +13,12 @@
   "lowPrice": 99.58,
   "dataDate": "2026-07-31",
   "reportPublishDate": "2026-08-05",
-  "dataAgeDays": 28,
+  "dataAgeDays": 30,
   "isStale": true,
   "source": "ICE Official U.S. Dollar Historical Prices",
   "sourceReport": "ICE Report 297",
   "sourceFile": "/publicdocs/futures_us_reports/usd_index/US_Dollar_Index_Historical_Prices.xls",
-  "generatedAt": "2026-08-28T18:48:59.069318+00:00",
+  "generatedAt": "2026-08-30T23:36:08.930819+00:00",
   "openInterest": 53678,
   "volume": 33693
 }
