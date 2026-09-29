@@ -8,16 +8,13 @@
   "contractMonth": "202609",
   "contractLabel": "SEP 26",
   "contractCode": "GC2609",
-  "settlementPrice": 4286.2,
-  "tradeDate": "2026-09-25",
-  "officialTradeDate": "09/25/2026",
+  "settlementPrice": 4135.4,
+  "tradeDate": "2026-09-28",
+  "officialTradeDate": "09/28/2026",
   "previousSettlementPrice": null,
   "source": "CME Group Official Settlement",
   "sourcePage": "https://www.cmegroup.com/markets/metals/precious/gold.settlements.html",
-  "generatedAt": "2026-09-29T01:03:36.755073+00:00",
-  "open": 4287.9,
-  "high": 4287.9,
-  "low": 4287.9,
-  "volume": 13.0,
-  "openInterest": 107.0
+  "generatedAt": "2026-09-29T13:03:37.989117+00:00",
+  "volume": 20.0,
+  "openInterest": 11.0
 }
